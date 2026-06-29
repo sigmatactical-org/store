@@ -79,20 +79,20 @@ Run catalog and shop on different ports:
 
 ```bash
 # Terminal 1 — catalog (default 8080)
-cd commerce/catalog && ./scripts/prepare-local.sh && cargo run -p sigma-catalog
+cd sigma/commerce/catalog && ./scripts/prepare-local.sh && cargo run -p sigma-catalog
 
 # Terminal 2 — shop
-cd commerce/shop && ./scripts/prepare-local.sh
+cd sigma/commerce/shop && ./scripts/prepare-local.sh
 export SHOP_CATALOG_BASE_URL=http://127.0.0.1:8080/
 export PORT=8082
 cargo run -p sigma-shop
 ```
 
-From the sigma workspace (commerce nested workspace):
+From the sigma workspace (`sigma/commerce/`):
 
 ```bash
-for svc in catalog shop; do (cd "commerce/$svc" && ./scripts/prepare-local.sh); done
-(cd commerce && SHOP_CATALOG_BASE_URL=http://127.0.0.1:8080/ PORT=8082 cargo run -p sigma-shop)
+cd sigma/commerce && ./scripts/prepare-local.sh
+SHOP_CATALOG_BASE_URL=http://127.0.0.1:8080/ PORT=8082 cargo run -p sigma-shop
 ```
 
 Open http://localhost:8082
