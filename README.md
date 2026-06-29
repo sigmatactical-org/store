@@ -20,7 +20,7 @@ Shared site chrome comes from [sigma-theme](https://github.com/sigmatactical-org
 |----------|---------|
 | `PORT` | Listen port (default `8080`) |
 | `SHOP_DATA_PATH` | JSON database path (default `data/shop.json`) |
-| `SHOP_CATALOG_BASE_URL` | Catalog service root (e.g. `http://127.0.0.1:8081/`) |
+| `SHOP_CATALOG_BASE_URL` | Catalog service root (e.g. `http://127.0.0.1:8080/`) |
 | `SHOP_IDENTITY_ISSUER_URL` | OIDC issuer / realm URL (e.g. `http://127.0.0.1:8101/realms/multcorp`) |
 | `SHOP_IDENTITY_CLIENT_ID` | Service-account client id for Admin API |
 | `SHOP_IDENTITY_CLIENT_SECRET` | Service-account client secret |
@@ -79,21 +79,20 @@ Run catalog and shop on different ports:
 
 ```bash
 # Terminal 1 — catalog (default 8080)
-cd catalog && ./scripts/prepare-local.sh && cargo run -p sigma-catalog
+cd commerce/catalog && ./scripts/prepare-local.sh && cargo run -p sigma-catalog
 
 # Terminal 2 — shop
-cd shop && ./scripts/prepare-local.sh
+cd commerce/shop && ./scripts/prepare-local.sh
 export SHOP_CATALOG_BASE_URL=http://127.0.0.1:8080/
 export PORT=8082
 cargo run -p sigma-shop
 ```
 
-From the monorepo root:
+From the sigma workspace (commerce nested workspace):
 
 ```bash
-(cd catalog && ./scripts/prepare-local.sh)
-(cd shop && ./scripts/prepare-local.sh)
-SHOP_CATALOG_BASE_URL=http://127.0.0.1:8080/ PORT=8082 cargo run -p sigma-shop
+for svc in catalog shop; do (cd "commerce/$svc" && ./scripts/prepare-local.sh); done
+(cd commerce && SHOP_CATALOG_BASE_URL=http://127.0.0.1:8080/ PORT=8082 cargo run -p sigma-shop)
 ```
 
 Open http://localhost:8082
