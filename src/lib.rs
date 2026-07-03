@@ -1,4 +1,4 @@
-//! Sigma Shop: storefront listings backed by the product catalog.
+//! Sigma Store: public storefront and internal admin UI for catalog listings.
 
 mod api;
 mod catalog;
@@ -16,10 +16,10 @@ use tokio::sync::Mutex;
 use warp::Filter;
 use warp::Reply;
 
-pub use model::{CreateListing, Listing, ShopUser, UpdateListing};
+pub use model::{CreateListing, Listing, RealmUser, UpdateListing};
 
-/// Shared mutable shop store handle.
-pub type SharedStore = Arc<Mutex<store::ShopStore>>;
+/// Shared mutable listings store handle.
+pub type SharedStore = Arc<Mutex<store::ListingsStore>>;
 
 /// Resolve listen address from **`PORT`** (default **8080**).
 #[must_use]
@@ -40,7 +40,7 @@ fn with_store(
 
 /// Site routes: web UI, JSON API, `/up`, theme static assets, error recovery.
 pub fn routes(
-    store: store::ShopStore,
+    store: store::ListingsStore,
 ) -> impl Filter<Extract = (impl Reply,), Error = Infallible> + Clone + Send + 'static {
     use warp::reply::with::header;
 
@@ -71,9 +71,9 @@ mod tests {
     use tempfile::TempDir;
     use warp::http::StatusCode;
 
-    fn test_store() -> store::ShopStore {
+    fn test_store() -> store::ListingsStore {
         let dir = TempDir::new().unwrap();
-        store::ShopStore::load(dir.path().join("shop.json")).unwrap()
+        store::ListingsStore::load(dir.path().join("store.json")).unwrap()
     }
 
     #[tokio::test]
@@ -87,7 +87,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn index_lists_shop() {
+    async fn index_lists_store() {
         let res = warp::test::request()
             .method("GET")
             .path("/")
@@ -95,7 +95,29 @@ mod tests {
             .await;
         assert_eq!(res.status(), StatusCode::OK);
         let body = std::str::from_utf8(res.body()).unwrap();
-        assert!(body.contains("Shop"));
+        assert!(body.contains("Sigma Store"));
+    }
+
+    #[tokio::test]
+    async fn admin_page_renders() {
+        let res = warp::test::request()
+            .method("GET")
+            .path("/admin")
+            .reply(&routes(test_store()))
+            .await;
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = std::str::from_utf8(res.body()).unwrap();
+        assert!(body.contains("Manage listings"));
+    }
+
+    #[tokio::test]
+    async fn product_page_not_found_for_unknown_sku() {
+        let res = warp::test::request()
+            .method("GET")
+            .path("/products/does-not-exist")
+            .reply(&routes(test_store()))
+            .await;
+        assert_eq!(res.status(), StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]

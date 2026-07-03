@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}{{ name }} — Sigma Store{% endblock %}
+
+{% block brand %}Sigma Store{% endblock %}
+
+{% block main_class %}store-main{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <p class="mb-3"><a class="text-decoration-none" href="/">&larr; Back to store</a></p>
+
+  <div class="row g-4">
+    <div class="col-lg-8">
+      {% if let Some(category) = category.as_ref() %}
+      <p class="text-secondary text-uppercase small mb-1">{{ category }}</p>
+      {% endif %}
+      <h1 class="mb-1">{{ name }}</h1>
+      <p class="text-secondary small mb-3"><code>{{ sku_code }}</code></p>
+      {% for paragraph in description_paragraphs %}
+      <p>{{ paragraph }}</p>
+      {% endfor %}
+    </div>
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-body">
+          {% if !price_display.is_empty() %}
+          <p class="fs-3 fw-semibold mb-2">{{ price_display }}</p>
+          {% endif %}
+          <p class="text-secondary small mb-0">Hand-built to order. Contact Sigma Tactical Group to arrange a build.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

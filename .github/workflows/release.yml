@@ -34,7 +34,7 @@ env:
   NODE_VERSION: "22"
   CARGO_TERM_COLOR: always
   CONTAINER_PORT: "8080"
-  IMAGE_NAME: sigma-shop
+  IMAGE_NAME: sigma-store
 
 jobs:
   publish-and-deploy:

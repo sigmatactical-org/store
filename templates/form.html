@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}{% if listing.is_some() %}Edit listing{% else %}New listing{% endif %} — Sigma Shop{% endblock %}
+{% block title %}{% if listing.is_some() %}Edit listing{% else %}New listing{% endif %} — Sigma Store{% endblock %}
 
-{% block brand %}Sigma Shop{% endblock %}
+{% block brand %}Sigma Store admin{% endblock %}
 
-{% block main_class %}shop-main{% endblock %}
+{% block main_class %}store-main{% endblock %}
 
 {% block content %}
 <div class="container py-4">
   <h1>{% if listing.is_some() %}Edit listing{% else %}Add listing{% endif %}</h1>
-  <p class="text-secondary">Link a catalog SKU to the shop with price, visibility, and display order.</p>
+  <p class="text-secondary">Link a catalog SKU to the store with price, visibility, and display order.</p>
 
   {% if let Some(err) = error %}
   <div class="alert alert-danger" role="alert">{{ err }}</div>
@@ -20,7 +20,7 @@
       <label for="sku_id" class="form-label">Catalog SKU</label>
       {% if catalog_skus.is_empty() %}
       <input type="text" class="form-control" id="sku_id" name="sku_id" value="{{ sku_id }}" required placeholder="Catalog SKU id">
-      <div class="form-text">Enter the catalog SKU id. Configure <code>SHOP_CATALOG_BASE_URL</code> to pick from a list.</div>
+      <div class="form-text">Enter the catalog SKU id. Configure <code>STORE_CATALOG_BASE_URL</code> to pick from a list.</div>
       {% else %}
       <select class="form-select" id="sku_id" name="sku_id" required>
         <option value="" disabled {% if sku_id.is_empty() %}selected{% endif %}>Select a SKU…</option>
@@ -50,7 +50,7 @@
     </div>
     <div class="d-flex gap-2">
       <button type="submit" class="btn btn-primary">Save</button>
-      <a class="btn btn-outline-secondary" href="/">Cancel</a>
+      <a class="btn btn-outline-secondary" href="/admin">Cancel</a>
     </div>
   </form>
 </div>

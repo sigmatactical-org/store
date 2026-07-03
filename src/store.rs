@@ -26,13 +26,13 @@ struct Database {
 }
 
 #[derive(Debug, Clone)]
-pub struct ShopStore {
+pub struct ListingsStore {
     path: PathBuf,
     db: Database,
 }
 
-impl ShopStore {
-    /// Load or initialize the shop database at `path`.
+impl ListingsStore {
+    /// Load or initialize the store database at `path`.
     pub fn load(path: impl AsRef<Path>) -> Result<Self, StoreError> {
         let path = path.as_ref().to_path_buf();
         let db = if path.exists() {
@@ -127,9 +127,9 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    fn test_store() -> (ShopStore, TempDir) {
+    fn test_store() -> (ListingsStore, TempDir) {
         let dir = TempDir::new().unwrap();
-        let store = ShopStore::load(dir.path().join("shop.json")).unwrap();
+        let store = ListingsStore::load(dir.path().join("store.json")).unwrap();
         (store, dir)
     }
 

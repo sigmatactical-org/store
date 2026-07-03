@@ -1,17 +1,17 @@
 use std::path::PathBuf;
 
-/// Path to the JSON shop database.
+/// Path to the JSON store database.
 #[must_use]
 pub fn data_path() -> PathBuf {
-    std::env::var("SHOP_DATA_PATH")
+    std::env::var("STORE_DATA_PATH")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("data/shop.json"))
+        .unwrap_or_else(|_| PathBuf::from("data/store.json"))
 }
 
 /// Base URL of the catalog service (e.g. `http://127.0.0.1:8081/`).
 #[must_use]
 pub fn catalog_base_url() -> Option<String> {
-    std::env::var("SHOP_CATALOG_BASE_URL")
+    std::env::var("STORE_CATALOG_BASE_URL")
         .ok()
         .filter(|s| !s.trim().is_empty())
         .map(|s| {
@@ -32,7 +32,7 @@ pub fn catalog_configured() -> bool {
 /// OIDC issuer URL for the identity provider (Keycloak realm URL).
 #[must_use]
 pub fn identity_issuer_url() -> Option<String> {
-    std::env::var("SHOP_IDENTITY_ISSUER_URL")
+    std::env::var("STORE_IDENTITY_ISSUER_URL")
         .ok()
         .filter(|s| !s.trim().is_empty())
 }
@@ -40,7 +40,7 @@ pub fn identity_issuer_url() -> Option<String> {
 /// Service-account client id for Keycloak Admin API access.
 #[must_use]
 pub fn identity_client_id() -> Option<String> {
-    std::env::var("SHOP_IDENTITY_CLIENT_ID")
+    std::env::var("STORE_IDENTITY_CLIENT_ID")
         .ok()
         .filter(|s| !s.trim().is_empty())
 }
@@ -48,7 +48,7 @@ pub fn identity_client_id() -> Option<String> {
 /// Service-account client secret for Keycloak Admin API access.
 #[must_use]
 pub fn identity_client_secret() -> Option<String> {
-    std::env::var("SHOP_IDENTITY_CLIENT_SECRET")
+    std::env::var("STORE_IDENTITY_CLIENT_SECRET")
         .ok()
         .filter(|s| !s.trim().is_empty())
 }

@@ -13,7 +13,9 @@ use crate::templates::{self, FormValues};
 pub fn routes(
     store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
-    index_page(store.clone())
+    storefront_page(store.clone())
+        .or(product_page(store.clone()))
+        .or(admin_page(store.clone()))
         .or(new_listing_page(store.clone()))
         .or(create_listing_form(store.clone()))
         .or(edit_listing_page(store.clone()))
@@ -21,10 +23,48 @@ pub fn routes(
         .or(delete_listing_form(store))
 }
 
-fn index_page(
+/// Public storefront: `GET /`. Visible, catalog-backed listings only.
+fn storefront_page(
     store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
     warp::path::end()
+        .and(warp::get())
+        .and(store)
+        .and_then(|store: SharedStore| async move {
+            let listings = store.lock().await.list();
+            let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
+            templates::render_storefront_html(listings, &catalog_skus)
+                .map(warp::reply::html)
+                .map_err(|_| warp::reject::not_found())
+        })
+}
+
+/// Public product detail page: `GET /products/{sku_code}`.
+fn product_page(
+    store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
+) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
+    warp::path!("products" / String)
+        .and(warp::get())
+        .and(store)
+        .and_then(|sku_code: String, store: SharedStore| async move {
+            let listings = store.lock().await.list();
+            let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
+            let Some(product) = templates::find_product(&sku_code, &listings, &catalog_skus) else {
+                return Err(warp::reject::not_found());
+            };
+            templates::render_product_html(product)
+                .map(warp::reply::html)
+                .map_err(|_| warp::reject::not_found())
+        })
+}
+
+/// Internal admin dashboard: `GET /admin`. Intended to be reached only through
+/// the sigma-identity authenticated proxy in production.
+fn admin_page(
+    store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
+) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
+    warp::path("admin")
+        .and(warp::path::end())
         .and(warp::get())
         .and(store)
         .and_then(|store: SharedStore| async move {
@@ -40,7 +80,7 @@ fn index_page(
                 Err(e) if crate::config::identity_configured() => (None, Some(e.to_string())),
                 Err(_) => (None, None),
             };
-            templates::render_index_html(templates::IndexPageInput {
+            templates::render_admin_html(templates::AdminPageInput {
                 listings,
                 catalog_skus: catalog_skus.as_deref().unwrap_or(&[]),
                 catalog_configured: crate::config::catalog_configured(),
@@ -102,8 +142,10 @@ fn create_listing_form(
                         )
                     } else {
                         match store.create(input) {
-                            Ok(_) => warp::redirect::redirect(warp::http::Uri::from_static("/"))
-                                .into_response(),
+                            Ok(_) => {
+                                warp::redirect::redirect(warp::http::Uri::from_static("/admin"))
+                                    .into_response()
+                            }
                             Err(e) => render_form_error(listings, &catalog_skus, None, values, e),
                         }
                     }
@@ -167,7 +209,7 @@ fn update_listing_form(
                         } else {
                             match store.update(&id, input) {
                                 Ok(_) => {
-                                    warp::redirect::redirect(warp::http::Uri::from_static("/"))
+                                    warp::redirect::redirect(warp::http::Uri::from_static("/admin"))
                                         .into_response()
                                 }
                                 Err(e) => {
@@ -203,11 +245,12 @@ fn delete_listing_form(
             let mut store = store.lock().await;
             let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
             match store.delete(&id) {
-                Ok(()) => {
-                    Ok(warp::redirect::redirect(warp::http::Uri::from_static("/")).into_response())
-                }
+                Ok(()) => Ok(
+                    warp::redirect::redirect(warp::http::Uri::from_static("/admin"))
+                        .into_response(),
+                ),
                 Err(StoreError::NotFound) => Err(warp::reject::not_found()),
-                Err(e) => templates::render_index_html(templates::IndexPageInput {
+                Err(e) => templates::render_admin_html(templates::AdminPageInput {
                     listings: store.list(),
                     catalog_skus: &catalog_skus,
                     catalog_configured: crate::config::catalog_configured(),

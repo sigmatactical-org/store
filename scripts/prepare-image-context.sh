@@ -2,9 +2,9 @@
 # Populate build/image/ for `docker build -f Dockerfile build/image`.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/target/release/sigma-shop"
-if [[ ! -f "$BIN" && -f "$ROOT/../target/release/sigma-shop" ]]; then
-  BIN="$ROOT/../target/release/sigma-shop"
+BIN="$ROOT/target/release/sigma-store"
+if [[ ! -f "$BIN" && -f "$ROOT/../target/release/sigma-store" ]]; then
+  BIN="$ROOT/../target/release/sigma-store"
 fi
 if [[ ! -f "$BIN" ]]; then
   echo "error: missing $BIN — run: cargo build --release" >&2
@@ -12,5 +12,5 @@ if [[ ! -f "$BIN" ]]; then
 fi
 
 mkdir -p "$ROOT/build/image"
-cp "$BIN" "$ROOT/build/image/sigma-shop"
-chmod 555 "$ROOT/build/image/sigma-shop"
+cp "$BIN" "$ROOT/build/image/sigma-store"
+chmod 555 "$ROOT/build/image/sigma-store"

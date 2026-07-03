@@ -1,20 +1,40 @@
 use askama::Template;
 
 use crate::catalog::CatalogSku;
-use crate::model::{Listing, ShopUser, format_price_cents, price_cents_to_form};
+use crate::model::{Listing, RealmUser, format_price_cents, price_cents_to_form};
 use sigma_theme::copyright_years;
 
+/// Public storefront home page: visible, catalog-backed listings only.
 #[derive(Template)]
 #[template(path = "index.html")]
-struct IndexTemplate {
+struct StorefrontTemplate {
     storefront_items: Vec<StorefrontRow>,
+    copyright_years: String,
+}
+
+/// Internal admin dashboard: listing management + identity users + config status.
+#[derive(Template)]
+#[template(path = "admin.html")]
+struct AdminTemplate {
     admin_rows: Vec<AdminRow>,
     catalog_configured: bool,
     catalog_error: Option<String>,
-    identity_users: Vec<ShopUser>,
+    identity_users: Vec<RealmUser>,
     identity_configured: bool,
     identity_error: Option<String>,
     message: Option<String>,
+    copyright_years: String,
+}
+
+/// Public product detail page for a single storefront item.
+#[derive(Template)]
+#[template(path = "product.html")]
+struct ProductTemplate {
+    sku_code: String,
+    name: String,
+    category: Option<String>,
+    description_paragraphs: Vec<String>,
+    price_display: String,
     copyright_years: String,
 }
 
@@ -35,11 +55,10 @@ struct FormTemplate {
 pub struct StorefrontRow {
     pub sku_code: String,
     pub name: String,
-    pub description: Option<String>,
+    pub excerpt: Option<String>,
     pub category: Option<String>,
     pub price_display: String,
     pub featured: bool,
-    pub missing_catalog: bool,
 }
 
 pub struct AdminRow {
@@ -66,6 +85,8 @@ pub struct FormValues {
     pub sort_order: String,
 }
 
+const EXCERPT_MAX_LEN: usize = 220;
+
 fn catalog_sku_refs(skus: &[CatalogSku]) -> Vec<CatalogSkuRef> {
     skus.iter()
         .filter(|s| s.active)
@@ -81,38 +102,50 @@ fn resolve_sku<'a>(skus: &'a [CatalogSku], sku_id: &str) -> Option<&'a CatalogSk
     skus.iter().find(|s| s.id == sku_id)
 }
 
+/// First paragraph (or a truncated slice) of a description, for grid cards.
+fn excerpt(description: &str) -> String {
+    let first_paragraph = description
+        .split("\n\n")
+        .next()
+        .unwrap_or(description)
+        .trim();
+    if first_paragraph.chars().count() <= EXCERPT_MAX_LEN {
+        return first_paragraph.to_string();
+    }
+    let truncated: String = first_paragraph.chars().take(EXCERPT_MAX_LEN).collect();
+    let truncated = truncated
+        .rsplit_once(' ')
+        .map(|(head, _)| head)
+        .unwrap_or(&truncated);
+    format!("{truncated}…")
+}
+
+/// Split a description into paragraphs on blank lines, for the product page.
+fn description_paragraphs(description: &str) -> Vec<String> {
+    description
+        .split("\n\n")
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
 fn storefront_rows(listings: &[Listing], skus: &[CatalogSku]) -> Vec<StorefrontRow> {
     listings
         .iter()
         .filter(|l| l.visible)
         .filter_map(|listing| {
-            let sku = resolve_sku(skus, &listing.sku_id);
-            if sku.is_none() && !skus.is_empty() {
+            let sku = resolve_sku(skus, &listing.sku_id)?;
+            if !sku.active {
                 return None;
             }
-            let (sku_code, name, description, category) = match sku {
-                Some(s) if s.active => (
-                    s.sku_code.clone(),
-                    s.name.clone(),
-                    s.description.clone(),
-                    s.category.clone(),
-                ),
-                Some(_) => return None,
-                None => (
-                    listing.sku_id.clone(),
-                    "Unknown item".to_string(),
-                    None,
-                    None,
-                ),
-            };
             Some(StorefrontRow {
-                sku_code,
-                name,
-                description,
-                category,
+                sku_code: sku.sku_code.clone(),
+                name: sku.name.clone(),
+                excerpt: sku.description.as_deref().map(excerpt),
+                category: sku.category.clone(),
                 price_display: format_price_cents(listing.price_cents),
                 featured: listing.featured,
-                missing_catalog: sku.is_none(),
             })
         })
         .collect()
@@ -188,13 +221,27 @@ fn render_form(
     .render()
 }
 
-/// Inputs for rendering the shop index page.
-pub struct IndexPageInput<'a> {
+/// # Errors
+///
+/// Returns [`askama::Error`] when template rendering fails.
+pub fn render_storefront_html(
+    listings: Vec<Listing>,
+    catalog_skus: &[CatalogSku],
+) -> Result<String, askama::Error> {
+    StorefrontTemplate {
+        storefront_items: storefront_rows(&listings, catalog_skus),
+        copyright_years: copyright_years(),
+    }
+    .render()
+}
+
+/// Inputs for rendering the admin dashboard page.
+pub struct AdminPageInput<'a> {
     pub listings: Vec<Listing>,
     pub catalog_skus: &'a [CatalogSku],
     pub catalog_configured: bool,
     pub catalog_error: Option<String>,
-    pub identity_users: &'a [ShopUser],
+    pub identity_users: &'a [RealmUser],
     pub identity_configured: bool,
     pub identity_error: Option<String>,
     pub message: Option<String>,
@@ -203,9 +250,8 @@ pub struct IndexPageInput<'a> {
 /// # Errors
 ///
 /// Returns [`askama::Error`] when template rendering fails.
-pub fn render_index_html(input: IndexPageInput<'_>) -> Result<String, askama::Error> {
-    IndexTemplate {
-        storefront_items: storefront_rows(&input.listings, input.catalog_skus),
+pub fn render_admin_html(input: AdminPageInput<'_>) -> Result<String, askama::Error> {
+    AdminTemplate {
         admin_rows: admin_rows(&input.listings, input.catalog_skus),
         catalog_configured: input.catalog_configured,
         catalog_error: input.catalog_error,
@@ -213,6 +259,52 @@ pub fn render_index_html(input: IndexPageInput<'_>) -> Result<String, askama::Er
         identity_configured: input.identity_configured,
         identity_error: input.identity_error,
         message: input.message,
+        copyright_years: copyright_years(),
+    }
+    .render()
+}
+
+/// A single storefront item resolved for the product detail page.
+pub struct ProductDetail {
+    pub sku_code: String,
+    pub name: String,
+    pub category: Option<String>,
+    pub description: Option<String>,
+    pub price_display: String,
+}
+
+/// Resolve a visible, active product by its catalog SKU code.
+#[must_use]
+pub fn find_product(
+    sku_code: &str,
+    listings: &[Listing],
+    skus: &[CatalogSku],
+) -> Option<ProductDetail> {
+    let sku = skus.iter().find(|s| s.active && s.sku_code == sku_code)?;
+    let listing = listings.iter().find(|l| l.visible && l.sku_id == sku.id)?;
+    Some(ProductDetail {
+        sku_code: sku.sku_code.clone(),
+        name: sku.name.clone(),
+        category: sku.category.clone(),
+        description: sku.description.clone(),
+        price_display: format_price_cents(listing.price_cents),
+    })
+}
+
+/// # Errors
+///
+/// Returns [`askama::Error`] when template rendering fails.
+pub fn render_product_html(product: ProductDetail) -> Result<String, askama::Error> {
+    ProductTemplate {
+        sku_code: product.sku_code,
+        name: product.name,
+        category: product.category,
+        description_paragraphs: product
+            .description
+            .as_deref()
+            .map(description_paragraphs)
+            .unwrap_or_default(),
+        price_display: product.price_display,
         copyright_years: copyright_years(),
     }
     .render()

@@ -1,167 +1,46 @@
 {% extends "base.html" %}
 
-{% block title %}Sigma Shop{% endblock %}
+{% block title %}Sigma Store{% endblock %}
 
-{% block brand %}Sigma Shop{% endblock %}
+{% block brand %}Sigma Store{% endblock %}
 
-{% block main_class %}shop-main{% endblock %}
+{% block main_class %}store-main{% endblock %}
 
 {% block content %}
 <div class="container py-4">
-  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <div>
-      <h1 class="mb-1">Shop</h1>
-      <p class="text-secondary mb-0">Storefront listings from the product catalog.</p>
-    </div>
-    <a class="btn btn-primary" href="/listings/new">Add listing</a>
+  <div class="mb-4">
+    <h1 class="mb-1">Sigma Store</h1>
+    <p class="text-secondary mb-0">Precision-built gear from Sigma Tactical Group.</p>
   </div>
 
-  {% if let Some(msg) = message %}
-  <div class="alert alert-info" role="status">{{ msg }}</div>
-  {% endif %}
-
-  {% if !catalog_configured %}
-  <div class="alert alert-warning" role="note">
-    Catalog integration is not configured. Set <code>SHOP_CATALOG_BASE_URL</code> to pull items from
-    <a href="https://github.com/sigmatactical-org/catalog">sigma-catalog</a>.
-  </div>
-  {% endif %}
-
-  {% if let Some(err) = catalog_error %}
-  <div class="alert alert-danger" role="alert">Could not load catalog: {{ err }}</div>
-  {% endif %}
-
-  {% if !identity_configured %}
-  <div class="alert alert-warning" role="note">
-    Identity integration is not configured. Set
-    <code>SHOP_IDENTITY_ISSUER_URL</code>,
-    <code>SHOP_IDENTITY_CLIENT_ID</code>, and
-    <code>SHOP_IDENTITY_CLIENT_SECRET</code> to pull users from
-    <a href="https://github.com/sigmatactical-org/identity">sigma-identity</a>.
-  </div>
-  {% endif %}
-
-  {% if let Some(err) = identity_error %}
-  <div class="alert alert-danger" role="alert">Could not load identity users: {{ err }}</div>
-  {% endif %}
-
-  <section class="mb-5">
-    <h2 class="h4">Storefront</h2>
-    {% if storefront_items.is_empty() %}
-    <p class="text-secondary">No visible listings yet. Add a listing that references a catalog SKU.</p>
-    {% else %}
-    <div class="row g-3">
-      {% for row in storefront_items %}
-      <div class="col-md-6 col-lg-4">
+  {% if storefront_items.is_empty() %}
+  <p class="text-secondary">No items in the store yet. Check back soon.</p>
+  {% else %}
+  <div class="row g-3">
+    {% for row in storefront_items %}
+    <div class="col-md-6 col-lg-4">
+      <a class="text-decoration-none text-reset" href="/products/{{ row.sku_code }}">
         <div class="card h-100{% if row.featured %} border-primary{% endif %}">
           <div class="card-body">
             {% if row.featured %}
             <span class="badge text-bg-primary mb-2">Featured</span>
             {% endif %}
-            <h3 class="h5 card-title">{{ row.name }}</h3>
-            <p class="text-secondary small mb-1"><code>{{ row.sku_code }}</code></p>
+            <h2 class="h5 card-title">{{ row.name }}</h2>
             {% if let Some(category) = row.category.as_ref() %}
             <p class="text-secondary small mb-2">{{ category }}</p>
             {% endif %}
-            {% if let Some(desc) = row.description.as_ref() %}
-            <p class="card-text small">{{ desc }}</p>
+            {% if let Some(text) = row.excerpt.as_ref() %}
+            <p class="card-text small">{{ text }}</p>
             {% endif %}
             {% if !row.price_display.is_empty() %}
             <p class="fw-semibold mb-0">{{ row.price_display }}</p>
             {% endif %}
-            {% if row.missing_catalog %}
-            <p class="text-warning small mb-0 mt-2">Catalog SKU not found</p>
-            {% endif %}
           </div>
         </div>
-      </div>
-      {% endfor %}
+      </a>
     </div>
-    {% endif %}
-  </section>
-
-  <section class="mb-5">
-    <h2 class="h4">Identity users</h2>
-    {% if identity_users.is_empty() %}
-    <p class="text-secondary">No identity users loaded.{% if identity_configured %} Check identity provider credentials and realm access.{% endif %}</p>
-    {% else %}
-    <div class="table-responsive">
-      <table class="table table-sm align-middle">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Username</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for user in identity_users %}
-          <tr>
-            <td>{{ user.display_name }}</td>
-            <td>{% if let Some(email) = user.email.as_ref() %}{{ email }}{% else %}<span class="text-secondary">—</span>{% endif %}</td>
-            <td>{% if let Some(username) = user.username.as_ref() %}{{ username }}{% else %}<span class="text-secondary">—</span>{% endif %}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% endif %}
-  </section>
-
-  <section class="mb-4">
-    <h2 class="h4">Manage listings</h2>
-    {% if admin_rows.is_empty() %}
-    <p class="text-secondary">No listings yet.</p>
-    {% else %}
-    <div class="table-responsive">
-      <table class="table table-sm align-middle">
-        <thead>
-          <tr>
-            <th>SKU</th>
-            <th>Name</th>
-            <th>Price</th>
-            <th>Visible</th>
-            <th>Featured</th>
-            <th>Order</th>
-            <th>Updated</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in admin_rows %}
-          <tr>
-            <td><code>{{ row.sku_code }}</code>{% if row.missing_catalog %} <span class="text-warning" title="Missing from catalog">⚠</span>{% endif %}</td>
-            <td>{{ row.name }}</td>
-            <td>{% if row.price_display.is_empty() %}<span class="text-secondary">—</span>{% else %}{{ row.price_display }}{% endif %}</td>
-            <td>{{ row.visible_label }}</td>
-            <td>{{ row.featured_label }}</td>
-            <td>{{ row.listing.sort_order }}</td>
-            <td class="text-secondary"><small>{{ row.listing.updated_at }}</small></td>
-            <td class="text-nowrap">
-              <a class="btn btn-sm btn-outline-primary" href="/listings/{{ row.listing.id }}/edit">Edit</a>
-              <form method="post" action="/listings/{{ row.listing.id }}/delete" class="d-inline" onsubmit="return confirm('Delete this listing?');">
-                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-              </form>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% endif %}
-  </section>
-
-  <section class="mt-5">
-    <h2 class="h5">JSON API</h2>
-    <ul class="small text-secondary">
-      <li><code>GET /items</code> — visible storefront items (listings merged with catalog SKUs)</li>
-      <li><code>GET /users</code> — realm users from identity (requires identity config)</li>
-      <li><code>GET /listings</code> — list all listings (admin)</li>
-      <li><code>GET /listings/{id}</code> — get one listing</li>
-      <li><code>POST /listings</code> — create listing (JSON body)</li>
-      <li><code>PUT /listings/{id}</code> — update listing</li>
-      <li><code>DELETE /listings/{id}</code> — delete listing</li>
-    </ul>
-  </section>
+    {% endfor %}
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

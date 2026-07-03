@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 /// Realm user from the identity provider (Keycloak Admin API).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ShopUser {
+pub struct RealmUser {
     pub id: String,
     pub display_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -139,9 +139,22 @@ impl Listing {
 #[must_use]
 pub fn format_price_cents(cents: Option<u64>) -> String {
     match cents {
-        Some(c) => format!("${:.2}", c as f64 / 100.0),
+        Some(c) => format!("${}.{:02}", group_thousands(c / 100), c % 100),
         None => String::new(),
     }
+}
+
+/// Render a whole-dollar amount with thousands separators (e.g. `175000` -> `175,000`).
+fn group_thousands(dollars: u64) -> String {
+    let digits = dollars.to_string();
+    let mut grouped = String::with_capacity(digits.len() + digits.len() / 3);
+    for (i, ch) in digits.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            grouped.push(',');
+        }
+        grouped.push(ch);
+    }
+    grouped.chars().rev().collect()
 }
 
 #[must_use]
@@ -161,5 +174,13 @@ mod tests {
         assert_eq!(parse_price_cents("19.99").unwrap(), Some(1999));
         assert_eq!(parse_price_cents("5").unwrap(), Some(500));
         assert_eq!(parse_price_cents("").unwrap(), None);
+    }
+
+    #[test]
+    fn format_price_cents_groups_thousands() {
+        assert_eq!(format_price_cents(Some(1999)), "$19.99");
+        assert_eq!(format_price_cents(Some(17_500_000)), "$175,000.00");
+        assert_eq!(format_price_cents(Some(100)), "$1.00");
+        assert_eq!(format_price_cents(None), "");
     }
 }

@@ -1,11 +1,11 @@
 [package]
-name = "sigma-shop"
+name = "sigma-store"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.90.0"
 license = "MIT OR Apache-2.0"
 authors = ["Sigma Tactical Group contributors <https://github.com/sigmatactical-org>"]
-description = "Shop storefront for Sigma Tactical Group — catalog listings with web UI and JSON API"
+description = "Public storefront for Sigma Tactical Group — catalog listings with a customer-facing web UI, an internal admin UI, and a JSON API"
 publish = false
 
 [dependencies]

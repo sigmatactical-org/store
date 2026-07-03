@@ -16,7 +16,7 @@ struct ErrorBody {
 }
 
 #[derive(serde::Serialize)]
-struct ShopItem {
+struct StorefrontItem {
     listing: Listing,
     sku: Option<CatalogSku>,
 }
@@ -41,7 +41,7 @@ fn store_error_status(err: &StoreError) -> StatusCode {
     }
 }
 
-async fn enrich_listings(listings: Vec<Listing>) -> Vec<ShopItem> {
+async fn enrich_listings(listings: Vec<Listing>) -> Vec<StorefrontItem> {
     let skus = catalog::fetch_skus().await.ok();
     listings
         .into_iter()
@@ -49,7 +49,7 @@ async fn enrich_listings(listings: Vec<Listing>) -> Vec<ShopItem> {
             let sku = skus
                 .as_ref()
                 .and_then(|all| catalog::sku_by_id(all, &listing.sku_id).cloned());
-            ShopItem { listing, sku }
+            StorefrontItem { listing, sku }
         })
         .collect()
 }
@@ -133,7 +133,7 @@ fn get_listing(
             let sku = skus
                 .as_ref()
                 .and_then(|all| catalog::sku_by_id(all, &listing.sku_id).cloned());
-            Ok(warp::reply::json(&ShopItem { listing, sku }))
+            Ok(warp::reply::json(&StorefrontItem { listing, sku }))
         })
 }
 

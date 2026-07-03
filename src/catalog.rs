@@ -5,7 +5,7 @@ use crate::config;
 
 #[derive(Debug, Error)]
 pub enum CatalogError {
-    #[error("catalog integration is not configured (set SHOP_CATALOG_BASE_URL)")]
+    #[error("catalog integration is not configured (set STORE_CATALOG_BASE_URL)")]
     NotConfigured,
     #[error("HTTP request failed: {0}")]
     Http(#[from] reqwest::Error),

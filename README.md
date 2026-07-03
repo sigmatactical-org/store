@@ -1,17 +1,23 @@
-# sigma-shop
+# sigma-store
 
-Shop storefront for Sigma Tactical Group. Pulls product SKUs from the catalog service, manages shop listings locally, and exposes a server-rendered web UI plus JSON API.
+Public storefront for Sigma Tactical Group. Pulls product SKUs from the catalog service, manages storefront listings locally, and exposes a customer-facing web UI, an internal admin UI, plus a JSON API.
 
-Repository: https://github.com/sigmatactical-org/shop
+Repository: https://github.com/sigmatactical-org/store
 
 Shared site chrome comes from [sigma-theme](https://github.com/sigmatactical-org/sigma-theme). Product data comes from [sigma-catalog](https://github.com/sigmatactical-org/catalog). User directory comes from [sigma-identity](https://github.com/sigmatactical-org/identity) (Keycloak Admin API).
+
+## Public vs internal
+
+- **Public** (`sigmatactical.store`): `GET /` (storefront browse) and `GET /products/{sku_code}` (product detail). No admin data is rendered on these pages.
+- **Internal / admin only**: `GET /admin` (listing management + identity users) and the `/listings/*` CRUD pages. These are not linked from the public pages and, like [sigma-catalog](https://github.com/sigmatactical-org/catalog), [sigma-cart](https://github.com/sigmatactical-org/cart), and [sigma-contact](https://github.com/sigmatactical-org/contact), are intended to be reached only through the [sigma-identity](https://github.com/sigmatactical-org/identity) authenticated proxy in production — not exposed on the public domain.
 
 ## Features
 
 - **Catalog integration** — fetch SKUs from sigma-catalog at request time
 - **Identity integration** — fetch realm users from the identity provider (Keycloak Admin API)
-- **Shop listings** — link catalog SKUs to the storefront with price, visibility, featured flag, and sort order
-- **Web UI** — browse the storefront and manage listings
+- **Storefront listings** — link catalog SKUs to the storefront with price, visibility, featured flag, and sort order
+- **Public web UI** — browse the storefront and view product detail pages
+- **Admin web UI** — manage listings and look up identity users
 - **JSON API** — programmatic CRUD for integration behind [sigma-identity](https://github.com/sigmatactical-org/identity)
 
 ## Configuration
@@ -19,13 +25,13 @@ Shared site chrome comes from [sigma-theme](https://github.com/sigmatactical-org
 | Variable | Purpose |
 |----------|---------|
 | `PORT` | Listen port (default `8080`) |
-| `SHOP_DATA_PATH` | JSON database path (default `data/shop.json`) |
-| `SHOP_CATALOG_BASE_URL` | Catalog service root (e.g. `http://127.0.0.1:8080/`) |
-| `SHOP_IDENTITY_ISSUER_URL` | OIDC issuer / realm URL (e.g. `http://127.0.0.1:8101/realms/multcorp`) |
-| `SHOP_IDENTITY_CLIENT_ID` | Service-account client id for Admin API |
-| `SHOP_IDENTITY_CLIENT_SECRET` | Service-account client secret |
+| `STORE_DATA_PATH` | JSON database path (default `data/store.json`) |
+| `STORE_CATALOG_BASE_URL` | Catalog service root (e.g. `http://127.0.0.1:8080/`) |
+| `STORE_IDENTITY_ISSUER_URL` | OIDC issuer / realm URL (e.g. `http://127.0.0.1:8101/realms/multcorp`) |
+| `STORE_IDENTITY_CLIENT_ID` | Service-account client id for Admin API |
+| `STORE_IDENTITY_CLIENT_SECRET` | Service-account client secret |
 
-Catalog integration requires a running sigma-catalog instance. SKU definitions are managed in catalog; shop only controls how those SKUs appear on the storefront.
+Catalog integration requires a running sigma-catalog instance. SKU definitions are managed in catalog; store only controls how those SKUs appear on the storefront.
 
 Identity integration requires a Keycloak client with **service accounts enabled** and the **view-users** role on **realm-management**. In the dev realm, you can reuse the `identity` client credentials and assign that role to `service-account-identity`.
 
@@ -75,27 +81,36 @@ Browser clients call `/api/listings` on the identity host (with session + CSRF);
 
 ## Development
 
-Run catalog and shop on different ports:
+Run catalog and store on different ports:
 
 ```bash
 # Terminal 1 — catalog (default 8080)
 cd sigma/commerce/catalog && ./scripts/prepare-local.sh && cargo run -p sigma-catalog
 
-# Terminal 2 — shop
-cd sigma/commerce/shop && ./scripts/prepare-local.sh
-export SHOP_CATALOG_BASE_URL=http://127.0.0.1:8080/
+# Terminal 2 — store
+cd sigma/commerce/store && ./scripts/prepare-local.sh
+export STORE_CATALOG_BASE_URL=http://127.0.0.1:8080/
 export PORT=8082
-cargo run -p sigma-shop
+cargo run -p sigma-store
 ```
 
 From the sigma workspace (`sigma/commerce/`):
 
 ```bash
 cd sigma/commerce && ./scripts/prepare-local.sh
-SHOP_CATALOG_BASE_URL=http://127.0.0.1:8080/ PORT=8082 cargo run -p sigma-shop
+STORE_CATALOG_BASE_URL=http://127.0.0.1:8080/ PORT=8082 cargo run -p sigma-store
 ```
 
 Open http://localhost:8082
+
+### Seed the first product (Sigma Racer)
+
+With catalog and store both running locally, create the Sigma Racer SKU and listing:
+
+```bash
+CATALOG_URL=http://127.0.0.1:8080 STORE_URL=http://127.0.0.1:8082 \
+  ../scripts/seed-sigma-racer.sh
+```
 
 ## Docker
 
@@ -106,7 +121,7 @@ Release is in **`.github/workflows/release.yml`** when configured. Locally:
 docker build -f Dockerfile build/image
 ```
 
-Mount a volume at `/app/data` (or set `SHOP_DATA_PATH`) so listing data persists across restarts.
+Mount a volume at `/app/data` (or set `STORE_DATA_PATH`) so listing data persists across restarts.
 
 ## License
 

@@ -1,16 +1,16 @@
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 fn main() -> Result<(), BoxError> {
-    let addr = sigma_shop::listen_socket_addr_from_env();
+    let addr = sigma_store::listen_socket_addr_from_env();
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?
         .block_on(async move {
-            let store = sigma_shop::store::ShopStore::load(sigma_shop::config::data_path())?;
+            let store = sigma_store::store::ListingsStore::load(sigma_store::config::data_path())?;
             let listener = tokio::net::TcpListener::bind(addr).await?;
-            println!("Sigma Shop listening on http://{addr}");
-            warp::serve(sigma_shop::routes(store))
+            println!("Sigma Store listening on http://{addr}");
+            warp::serve(sigma_store::routes(store))
                 .incoming(listener)
                 .graceful(shutdown_signal())
                 .run()

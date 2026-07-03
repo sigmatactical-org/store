@@ -1,14 +1,14 @@
 # syntax=docker/dockerfile:1.6
-# COPY-only runtime image. Shop data lives on a mounted volume at runtime; CI stages build/image/ in GitHub Actions.
+# COPY-only runtime image. Store data lives on a mounted volume at runtime; CI stages build/image/ in GitHub Actions.
 FROM gcr.io/distroless/cc-debian13:nonroot@sha256:d3cda6e91129130d7229a1806b6a73d292ef245ab032da7851907798024cefba
 
 WORKDIR /app
 
-COPY --chmod=555 sigma-shop /app/sigma-shop
+COPY --chmod=555 sigma-store /app/sigma-store
 
 USER nonroot:nonroot
 
 ENV PORT=8080
 EXPOSE 8080
 
-ENTRYPOINT ["/app/sigma-shop"]
+ENTRYPOINT ["/app/sigma-store"]

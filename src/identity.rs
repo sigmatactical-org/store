@@ -1,12 +1,12 @@
 use thiserror::Error;
 
 use crate::config;
-use crate::model::ShopUser;
+use crate::model::RealmUser;
 
 #[derive(Debug, Error)]
 pub enum IdentityError {
     #[error(
-        "identity integration is not configured (set SHOP_IDENTITY_ISSUER_URL, SHOP_IDENTITY_CLIENT_ID, SHOP_IDENTITY_CLIENT_SECRET)"
+        "identity integration is not configured (set STORE_IDENTITY_ISSUER_URL, STORE_IDENTITY_CLIENT_ID, STORE_IDENTITY_CLIENT_SECRET)"
     )]
     NotConfigured,
     #[error("invalid issuer URL: {0}")]
@@ -101,7 +101,7 @@ fn display_name_for_user(user: &KeycloakUser) -> String {
 }
 
 /// Pull enabled realm users from the identity provider (Keycloak Admin API).
-pub async fn fetch_users() -> Result<Vec<ShopUser>, IdentityError> {
+pub async fn fetch_users() -> Result<Vec<RealmUser>, IdentityError> {
     let issuer_url = config::identity_issuer_url().ok_or(IdentityError::NotConfigured)?;
     let client_id = config::identity_client_id().ok_or(IdentityError::NotConfigured)?;
     let client_secret = config::identity_client_secret().ok_or(IdentityError::NotConfigured)?;
@@ -133,7 +133,7 @@ pub async fn fetch_users() -> Result<Vec<ShopUser>, IdentityError> {
         })
         .map(|u| {
             let display_name = display_name_for_user(&u);
-            ShopUser {
+            RealmUser {
                 id: u.id,
                 display_name,
                 email: u.email.filter(|e| !e.is_empty()),
