@@ -1,7 +1,9 @@
 use askama::Template;
 
+use crate::auth_links;
 use crate::catalog::CatalogSku;
 use crate::model::{Listing, RealmUser, format_price_cents, price_cents_to_form};
+use crate::specs::{SpecDocumentView, specs_for_sku};
 use sigma_theme::copyright_years;
 
 /// Public storefront home page: visible, catalog-backed listings only.
@@ -9,6 +11,8 @@ use sigma_theme::copyright_years;
 #[template(path = "index.html")]
 struct StorefrontTemplate {
     storefront_items: Vec<StorefrontRow>,
+    sign_in_url: String,
+    register_url: String,
     copyright_years: String,
 }
 
@@ -35,6 +39,9 @@ struct ProductTemplate {
     category: Option<String>,
     description_paragraphs: Vec<String>,
     price_display: String,
+    spec_documents: Vec<SpecDocumentView>,
+    sign_in_url: String,
+    register_url: String,
     copyright_years: String,
 }
 
@@ -228,8 +235,11 @@ pub fn render_storefront_html(
     listings: Vec<Listing>,
     catalog_skus: &[CatalogSku],
 ) -> Result<String, askama::Error> {
+    let auth = auth_links::auth_links_for_return_path("/");
     StorefrontTemplate {
         storefront_items: storefront_rows(&listings, catalog_skus),
+        sign_in_url: auth.sign_in_url,
+        register_url: auth.register_url,
         copyright_years: copyright_years(),
     }
     .render()
@@ -295,8 +305,10 @@ pub fn find_product(
 ///
 /// Returns [`askama::Error`] when template rendering fails.
 pub fn render_product_html(product: ProductDetail) -> Result<String, askama::Error> {
+    let return_path = format!("/products/{}", product.sku_code);
+    let auth = auth_links::auth_links_for_return_path(&return_path);
     ProductTemplate {
-        sku_code: product.sku_code,
+        sku_code: product.sku_code.clone(),
         name: product.name,
         category: product.category,
         description_paragraphs: product
@@ -305,6 +317,9 @@ pub fn render_product_html(product: ProductDetail) -> Result<String, askama::Err
             .map(description_paragraphs)
             .unwrap_or_default(),
         price_display: product.price_display,
+        spec_documents: specs_for_sku(&product.sku_code),
+        sign_in_url: auth.sign_in_url,
+        register_url: auth.register_url,
         copyright_years: copyright_years(),
     }
     .render()

@@ -1,11 +1,8 @@
-use std::path::PathBuf;
-
-/// Path to the JSON store database.
+/// PostgreSQL connection URL (shared Sigma database).
 #[must_use]
-pub fn data_path() -> PathBuf {
-    std::env::var("STORE_DATA_PATH")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("data/store.json"))
+pub fn database_url() -> String {
+    std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| sigma_pg::DEFAULT_DATABASE_URL.to_string())
 }
 
 /// Base URL of the catalog service (e.g. `http://127.0.0.1:8081/`).
@@ -59,4 +56,32 @@ pub fn identity_configured() -> bool {
     identity_issuer_url().is_some()
         && identity_client_id().is_some()
         && identity_client_secret().is_some()
+}
+
+/// Public base URL of the identity BFF (e.g. `http://127.0.0.1:3000/`).
+#[must_use]
+pub fn identity_public_base_url() -> String {
+    std::env::var("STORE_IDENTITY_PUBLIC_URL")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| normalize_base_url(&s))
+        .unwrap_or_else(|| "http://127.0.0.1:3000/".to_string())
+}
+
+/// Canonical public URL of this store (e.g. `http://127.0.0.1:8082/`).
+#[must_use]
+pub fn store_public_base_url() -> String {
+    std::env::var("STORE_PUBLIC_BASE_URL")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| normalize_base_url(&s))
+        .unwrap_or_else(|| "http://127.0.0.1:8082/".to_string())
+}
+
+fn normalize_base_url(url: &str) -> String {
+    let mut url = url.trim().to_string();
+    if !url.ends_with('/') {
+        url.push('/');
+    }
+    url
 }

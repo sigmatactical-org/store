@@ -25,13 +25,17 @@ Shared site chrome comes from [sigma-theme](https://github.com/sigmatactical-org
 | Variable | Purpose |
 |----------|---------|
 | `PORT` | Listen port (default `8080`) |
-| `STORE_DATA_PATH` | JSON database path (default `data/store.json`) |
+| `DATABASE_URL` | PostgreSQL connection URL (default `postgres://sigma:sigma@127.0.0.1:5432/sigma`) |
 | `STORE_CATALOG_BASE_URL` | Catalog service root (e.g. `http://127.0.0.1:8080/`) |
 | `STORE_IDENTITY_ISSUER_URL` | OIDC issuer / realm URL (e.g. `http://127.0.0.1:8101/realms/multcorp`) |
 | `STORE_IDENTITY_CLIENT_ID` | Service-account client id for Admin API |
 | `STORE_IDENTITY_CLIENT_SECRET` | Service-account client secret |
+| `STORE_IDENTITY_PUBLIC_URL` | Public identity BFF base URL for sign-in (e.g. `http://127.0.0.1:3000/`) |
+| `STORE_PUBLIC_BASE_URL` | Canonical store URL for login return (default `http://127.0.0.1:8082/`) |
 
-Catalog integration requires a running sigma-catalog instance. SKU definitions are managed in catalog; store only controls how those SKUs appear on the storefront.
+The **Sign in** button on public pages links to `{STORE_IDENTITY_PUBLIC_URL}/auth/login` with `app_uri` and `redirect_uri` set to the store. Add the store origin to identity's `IDENTITY_LOGIN_REDIRECT_APP_URIS` and `IDENTITY_REGISTRATION_RETURN_URIS` (e.g. `http://localhost:8082/*`).
+
+Build specifications for **SIGMA-RACER** are vendored from [racer](https://github.com/sigmatactical-org/racer) under `specs/` and rendered on the product detail page. SKU definitions are managed in catalog; store only controls how those SKUs appear on the storefront.
 
 Identity integration requires a Keycloak client with **service accounts enabled** and the **view-users** role on **realm-management**. In the dev realm, you can reuse the `identity` client credentials and assign that role to `service-account-identity`.
 
@@ -90,6 +94,8 @@ cd sigma/commerce/catalog && ./scripts/prepare-local.sh && cargo run -p sigma-ca
 # Terminal 2 — store
 cd sigma/commerce/store && ./scripts/prepare-local.sh
 export STORE_CATALOG_BASE_URL=http://127.0.0.1:8080/
+export STORE_IDENTITY_PUBLIC_URL=http://127.0.0.1:3000/
+export STORE_PUBLIC_BASE_URL=http://127.0.0.1:8082/
 export PORT=8082
 cargo run -p sigma-store
 ```
@@ -121,7 +127,12 @@ Release is in **`.github/workflows/release.yml`** when configured. Locally:
 docker build -f Dockerfile build/image
 ```
 
-Mount a volume at `/app/data` (or set `STORE_DATA_PATH`) so listing data persists across restarts.
+Data is stored in the shared PostgreSQL `store` schema (`store.snapshot` JSONB table). Start Postgres from [sigma-pg](https://github.com/sigmatactical-org/sigma-pg):
+
+```bash
+git clone https://github.com/sigmatactical-org/sigma-pg
+cd sigma-pg && docker compose -f docker-compose.deps.yml up -d
+```
 
 ## License
 

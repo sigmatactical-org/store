@@ -34,10 +34,9 @@ fn json_error(status: StatusCode, message: impl Into<String>) -> Response {
 fn store_error_status(err: &StoreError) -> StatusCode {
     match err {
         StoreError::NotFound => StatusCode::NOT_FOUND,
-        StoreError::SkuIdRequired | StoreError::DuplicateSkuId | StoreError::SkuNotInCatalog(_) => {
-            StatusCode::BAD_REQUEST
-        }
-        StoreError::Io(_) | StoreError::Json(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        StoreError::SkuIdRequired | StoreError::DuplicateSkuId | StoreError::SkuNotInCatalog(_)
+        | StoreError::InvalidInput(_) => StatusCode::BAD_REQUEST,
+        StoreError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
@@ -155,7 +154,7 @@ fn create_listing(
                 ));
             }
             let mut store = store.lock().await;
-            let response = match store.create(input) {
+            let response = match store.create(input).await {
                 Ok(listing) => {
                     warp::reply::with_status(warp::reply::json(&listing), StatusCode::CREATED)
                         .into_response()
@@ -185,7 +184,7 @@ fn update_listing(
                     ));
                 }
                 let mut store = store.lock().await;
-                let response = match store.update(&id, input) {
+                let response = match store.update(&id, input).await {
                     Ok(listing) => warp::reply::json(&listing).into_response(),
                     Err(StoreError::NotFound) => return Err(warp::reject::not_found()),
                     Err(e) => json_error(store_error_status(&e), e.to_string()),
@@ -204,7 +203,7 @@ fn delete_listing(
         .and(store)
         .and_then(|id: String, store: SharedStore| async move {
             let mut store = store.lock().await;
-            let response = match store.delete(&id) {
+            let response = match store.delete(&id).await {
                 Ok(()) => {
                     warp::reply::with_status(warp::reply(), StatusCode::NO_CONTENT).into_response()
                 }

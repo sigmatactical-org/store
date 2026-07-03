@@ -141,7 +141,7 @@ fn create_listing_form(
                             )),
                         )
                     } else {
-                        match store.create(input) {
+                        match store.create(input).await {
                             Ok(_) => {
                                 warp::redirect::redirect(warp::http::Uri::from_static("/admin"))
                                     .into_response()
@@ -207,7 +207,7 @@ fn update_listing_form(
                                 )),
                             )
                         } else {
-                            match store.update(&id, input) {
+                            match store.update(&id, input).await {
                                 Ok(_) => {
                                     warp::redirect::redirect(warp::http::Uri::from_static("/admin"))
                                         .into_response()
@@ -244,7 +244,7 @@ fn delete_listing_form(
         .and_then(|id: String, store: SharedStore| async move {
             let mut store = store.lock().await;
             let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
-            match store.delete(&id) {
+            match store.delete(&id).await {
                 Ok(()) => Ok(
                     warp::redirect::redirect(warp::http::Uri::from_static("/admin"))
                         .into_response(),
@@ -277,10 +277,7 @@ fn form_to_values(form: &ListingForm) -> FormValues {
 }
 
 fn invalid_input(message: String) -> StoreError {
-    StoreError::Io(std::io::Error::new(
-        std::io::ErrorKind::InvalidInput,
-        message,
-    ))
+    StoreError::InvalidInput(message)
 }
 
 fn render_form_error(

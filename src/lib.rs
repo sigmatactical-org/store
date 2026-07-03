@@ -1,10 +1,12 @@
 //! Sigma Store: public storefront and internal admin UI for catalog listings.
 
 mod api;
+mod auth_links;
 mod catalog;
 pub mod config;
 mod identity;
 mod model;
+mod specs;
 pub mod store;
 mod templates;
 mod web;
@@ -68,12 +70,12 @@ pub fn routes(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use warp::http::StatusCode;
 
-    fn test_store() -> store::ListingsStore {
-        let dir = TempDir::new().unwrap();
-        store::ListingsStore::load(dir.path().join("store.json")).unwrap()
+    async fn test_store() -> store::ListingsStore {
+        store::ListingsStore::connect_empty()
+            .await
+            .expect("PostgreSQL required for tests")
     }
 
     #[tokio::test]
@@ -81,7 +83,7 @@ mod tests {
         let res = warp::test::request()
             .method("GET")
             .path("/up")
-            .reply(&routes(test_store()))
+            .reply(&routes(test_store().await))
             .await;
         assert_eq!(res.status(), StatusCode::OK);
     }
@@ -91,7 +93,7 @@ mod tests {
         let res = warp::test::request()
             .method("GET")
             .path("/")
-            .reply(&routes(test_store()))
+            .reply(&routes(test_store().await))
             .await;
         assert_eq!(res.status(), StatusCode::OK);
         let body = std::str::from_utf8(res.body()).unwrap();
@@ -103,7 +105,7 @@ mod tests {
         let res = warp::test::request()
             .method("GET")
             .path("/admin")
-            .reply(&routes(test_store()))
+            .reply(&routes(test_store().await))
             .await;
         assert_eq!(res.status(), StatusCode::OK);
         let body = std::str::from_utf8(res.body()).unwrap();
@@ -115,7 +117,7 @@ mod tests {
         let res = warp::test::request()
             .method("GET")
             .path("/products/does-not-exist")
-            .reply(&routes(test_store()))
+            .reply(&routes(test_store().await))
             .await;
         assert_eq!(res.status(), StatusCode::NOT_FOUND);
     }
@@ -126,7 +128,7 @@ mod tests {
             .method("GET")
             .path("/listings")
             .header("accept", "application/json")
-            .reply(&routes(test_store()))
+            .reply(&routes(test_store().await))
             .await;
         assert_eq!(res.status(), StatusCode::OK);
         let body: Vec<serde_json::Value> = serde_json::from_slice(res.body()).unwrap();
@@ -142,7 +144,7 @@ mod tests {
             .body(
                 r#"{"sku_id":"abc-123","price_cents":1999,"featured":true,"visible":true,"sort_order":0}"#,
             )
-            .reply(&routes(test_store()))
+            .reply(&routes(test_store().await))
             .await;
         assert_eq!(res.status(), StatusCode::CREATED);
         let listing: Listing = serde_json::from_slice(res.body()).unwrap();
@@ -156,7 +158,7 @@ mod tests {
             .method("GET")
             .path("/items")
             .header("accept", "application/json")
-            .reply(&routes(test_store()))
+            .reply(&routes(test_store().await))
             .await;
         assert_eq!(res.status(), StatusCode::OK);
         let body: Vec<serde_json::Value> = serde_json::from_slice(res.body()).unwrap();
@@ -169,7 +171,7 @@ mod tests {
             .method("GET")
             .path("/users")
             .header("accept", "application/json")
-            .reply(&routes(test_store()))
+            .reply(&routes(test_store().await))
             .await;
         assert_eq!(res.status(), StatusCode::SERVICE_UNAVAILABLE);
     }

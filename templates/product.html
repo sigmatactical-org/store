@@ -4,7 +4,26 @@
 
 {% block brand %}Sigma Store{% endblock %}
 
+{% block nav_actions %}
+{% include "nav_sign_in.html" %}
+{% endblock %}
+
 {% block main_class %}store-main{% endblock %}
+
+{% block extra_head %}
+<style>
+  .spec-markdown { font-size: 0.925rem; line-height: 1.55; }
+  .spec-markdown h1 { font-size: 1.35rem; margin-top: 2rem; margin-bottom: 1rem; }
+  .spec-markdown h2 { font-size: 1.15rem; margin-top: 1.75rem; margin-bottom: 0.75rem; }
+  .spec-markdown h3 { font-size: 1rem; margin-top: 1.25rem; margin-bottom: 0.5rem; }
+  .spec-markdown table { width: 100%; margin: 1rem 0; border-collapse: collapse; }
+  .spec-markdown th, .spec-markdown td { border: 1px solid rgba(255,255,255,0.15); padding: 0.45rem 0.6rem; vertical-align: top; }
+  .spec-markdown th { font-weight: 600; background: rgba(255,255,255,0.04); }
+  .spec-markdown blockquote { border-left: 3px solid rgba(255,255,255,0.25); padding-left: 1rem; color: var(--bs-secondary-color); }
+  .spec-markdown p, .spec-markdown li { color: var(--bs-secondary-color); }
+  .spec-markdown hr { border-color: rgba(255,255,255,0.12); margin: 1.5rem 0; }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="container py-4">
@@ -20,6 +39,17 @@
       {% for paragraph in description_paragraphs %}
       <p>{{ paragraph }}</p>
       {% endfor %}
+
+      {% if !spec_documents.is_empty() %}
+      <div class="mt-5">
+        <h2 class="h4 mb-4">Build specifications</h2>
+        {% for doc in spec_documents %}
+        <div class="spec-markdown mb-5">
+          {{ doc.html|safe }}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
     </div>
     <div class="col-lg-4">
       <div class="card">
