@@ -34,7 +34,9 @@ fn json_error(status: StatusCode, message: impl Into<String>) -> Response {
 fn store_error_status(err: &StoreError) -> StatusCode {
     match err {
         StoreError::NotFound => StatusCode::NOT_FOUND,
-        StoreError::SkuIdRequired | StoreError::DuplicateSkuId | StoreError::SkuNotInCatalog(_)
+        StoreError::SkuIdRequired
+        | StoreError::DuplicateSkuId
+        | StoreError::SkuNotInCatalog(_)
         | StoreError::InvalidInput(_) => StatusCode::BAD_REQUEST,
         StoreError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }
