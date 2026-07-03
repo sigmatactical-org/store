@@ -11,19 +11,22 @@ pub struct AuthLinks {
 pub fn auth_links_for_return_path(return_path: &str) -> AuthLinks {
     let identity_base = crate::config::identity_public_base_url();
     let store_base = crate::config::store_public_base_url();
-    let return_url = join_store_url(&store_base, return_path);
-    let app_uri = store_base.clone();
+    let app_uri = join_store_url(&store_base, return_path);
+    let callback_uri = format!(
+        "{}/auth/callback",
+        identity_base.trim_end_matches('/')
+    );
 
     let sign_in_url = format!(
-        "{identity_base}/auth/login?app_uri={app_uri}&redirect_uri={return_url}&scope=openid",
+        "{identity_base}/auth/login?app_uri={app_uri}&redirect_uri={callback_uri}&scope=openid",
         identity_base = identity_base.trim_end_matches('/'),
         app_uri = percent_encode(&app_uri),
-        return_url = percent_encode(&return_url),
+        callback_uri = percent_encode(&callback_uri),
     );
     let register_url = format!(
         "{identity_base}/register?return_url={return_url}",
         identity_base = identity_base.trim_end_matches('/'),
-        return_url = percent_encode(&return_url),
+        return_url = percent_encode(&app_uri),
     );
 
     AuthLinks {
@@ -90,5 +93,14 @@ mod tests {
             join_store_url("http://localhost:8082/", "/products/foo"),
             "http://localhost:8082/products/foo"
         );
+    }
+
+    #[test]
+    fn builds_login_with_identity_callback() {
+        let links = auth_links_for_return_path("/products/SIGMA-RACER");
+        assert!(links.sign_in_url.contains("app_uri=http%3A%2F%2F127.0.0.1%3A8082%2Fproducts%2FSIGMA-RACER"));
+        assert!(links.sign_in_url.contains(
+            "redirect_uri=http%3A%2F%2F127.0.0.1%3A3000%2Fauth%2Fcallback"
+        ));
     }
 }
