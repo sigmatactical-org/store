@@ -8,54 +8,72 @@
 {% include "nav_sign_in.html" %}
 {% endblock %}
 
-{% block main_class %}store-main{% endblock %}
-
-{% block extra_head %}
-<style>
-  .spec-markdown { font-size: 0.925rem; line-height: 1.55; }
-  .spec-markdown h1 { font-size: 1.35rem; margin-top: 2rem; margin-bottom: 1rem; }
-  .spec-markdown h2 { font-size: 1.15rem; margin-top: 1.75rem; margin-bottom: 0.75rem; }
-  .spec-markdown h3 { font-size: 1rem; margin-top: 1.25rem; margin-bottom: 0.5rem; }
-  .spec-markdown table { width: 100%; margin: 1rem 0; border-collapse: collapse; }
-  .spec-markdown th, .spec-markdown td { border: 1px solid rgba(255,255,255,0.15); padding: 0.45rem 0.6rem; vertical-align: top; }
-  .spec-markdown th { font-weight: 600; background: rgba(255,255,255,0.04); }
-  .spec-markdown blockquote { border-left: 3px solid rgba(255,255,255,0.25); padding-left: 1rem; color: var(--bs-secondary-color); }
-  .spec-markdown p, .spec-markdown li { color: var(--bs-secondary-color); }
-  .spec-markdown hr { border-color: rgba(255,255,255,0.12); margin: 1.5rem 0; }
-</style>
-{% endblock %}
+{% block main_class %}store-main product-page{% endblock %}
 
 {% block content %}
 <div class="container py-4">
-  <p class="mb-3"><a class="text-decoration-none" href="/">&larr; Back to store</a></p>
+  <p class="mb-3"><a class="text-decoration-none product-back" href="/">&larr; Back to store</a></p>
 
-  <div class="row g-4">
+  <div class="row g-4 align-items-start">
     <div class="col-lg-8">
       {% if let Some(category) = category.as_ref() %}
-      <p class="text-secondary text-uppercase small mb-1">{{ category }}</p>
+      <p class="text-secondary text-uppercase small mb-1 product-category">{{ category }}</p>
       {% endif %}
-      <h1 class="mb-1">{{ name }}</h1>
-      <p class="text-secondary small mb-3"><code>{{ sku_code }}</code></p>
+      <h1 class="mb-1 product-title">{{ name }}</h1>
+      <p class="text-secondary small mb-3"><code class="product-sku">{{ sku_code }}</code></p>
       {% for paragraph in description_paragraphs %}
-      <p>{{ paragraph }}</p>
+      <p class="product-lead">{{ paragraph }}</p>
       {% endfor %}
 
       {% if !spec_documents.is_empty() %}
-      <div class="mt-5">
-        <h2 class="h4 mb-4">Build specifications</h2>
-        {% for doc in spec_documents %}
-        <div class="spec-markdown mb-5">
-          {{ doc.html|safe }}
+      <section class="racer-specs" aria-label="Build specifications">
+        <header class="racer-specs__header">
+          <h2 class="racer-specs__title">Build specifications</h2>
+          <p class="racer-specs__subtitle">Technical documents from the racer repository</p>
+        </header>
+
+        <div class="racer-specs__chrome">
+          {% for doc in spec_documents %}
+          <input
+            type="radio"
+            name="racer-spec-tab"
+            id="racer-spec-{{ doc.id }}"
+            class="racer-specs__input"
+            {% if loop.first %}checked{% endif %}
+          />
+          {% endfor %}
+
+          <div class="racer-specs__tabs" role="tablist" aria-label="Specification documents">
+            {% for doc in spec_documents %}
+            <label class="racer-specs__tab" for="racer-spec-{{ doc.id }}" role="tab">
+              {{ doc.label }}
+            </label>
+            {% endfor %}
+          </div>
+
+          <div class="racer-specs__panels">
+            {% for doc in spec_documents %}
+            <article
+              class="racer-specs__panel racer-specs__panel--{{ doc.id }}"
+              role="tabpanel"
+              aria-labelledby="racer-spec-{{ doc.id }}"
+            >
+              <div class="racer-specs__markdown spec-markdown">
+                {{ doc.html|safe }}
+              </div>
+            </article>
+            {% endfor %}
+          </div>
         </div>
-        {% endfor %}
-      </div>
+      </section>
       {% endif %}
     </div>
+
     <div class="col-lg-4">
-      <div class="card">
+      <div class="card product-card">
         <div class="card-body">
           {% if !price_display.is_empty() %}
-          <p class="fs-3 fw-semibold mb-2">{{ price_display }}</p>
+          <p class="fs-3 fw-semibold mb-2 product-price">{{ price_display }}</p>
           {% endif %}
           <p class="text-secondary small mb-0">Hand-built to order. Contact Sigma Tactical Group to arrange a build.</p>
         </div>

@@ -3,7 +3,8 @@
 /// Resolved auth URLs for the storefront navbar.
 pub struct AuthLinks {
     pub sign_in_url: String,
-    pub register_url: String,
+    pub logout_url: String,
+    pub identity_base_url: String,
 }
 
 /// Build login and registration URLs that return the shopper to `return_path` on the store.
@@ -12,26 +13,25 @@ pub fn auth_links_for_return_path(return_path: &str) -> AuthLinks {
     let identity_base = crate::config::identity_public_base_url();
     let store_base = crate::config::store_public_base_url();
     let app_uri = join_store_url(&store_base, return_path);
-    let callback_uri = format!(
-        "{}/auth/callback",
-        identity_base.trim_end_matches('/')
-    );
+    let identity_root = identity_base.trim_end_matches('/');
+    let callback_uri = format!("{identity_root}/auth/callback");
+    let logout_callback_uri = format!("{identity_root}/auth/logoutcallback");
 
     let sign_in_url = format!(
-        "{identity_base}/auth/login?app_uri={app_uri}&redirect_uri={callback_uri}&scope=openid",
-        identity_base = identity_base.trim_end_matches('/'),
+        "{identity_root}/auth/login?app_uri={app_uri}&redirect_uri={callback_uri}&scope=openid",
         app_uri = percent_encode(&app_uri),
         callback_uri = percent_encode(&callback_uri),
     );
-    let register_url = format!(
-        "{identity_base}/register?return_url={return_url}",
-        identity_base = identity_base.trim_end_matches('/'),
-        return_url = percent_encode(&app_uri),
+    let logout_url = format!(
+        "{identity_root}/auth/logout?app_uri={app_uri}&redirect_uri={logout_callback_uri}",
+        app_uri = percent_encode(&app_uri),
+        logout_callback_uri = percent_encode(&logout_callback_uri),
     );
 
     AuthLinks {
         sign_in_url,
-        register_url,
+        logout_url,
+        identity_base_url: format!("{identity_root}/"),
     }
 }
 

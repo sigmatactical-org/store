@@ -8,8 +8,34 @@ const CHASSIS_SPEC: &str = include_str!("../specs/sigma-spec.md");
 const ELECTRONICS_SPEC: &str = include_str!("../specs/electronics.md");
 const EMISSIONS_SPEC: &str = include_str!("../specs/emissions_certification.md");
 
-/// Markdown rendered to HTML for the product page (GitHub-style tables, headings, lists).
+struct SpecSource {
+    id: &'static str,
+    label: &'static str,
+    markdown: &'static str,
+}
+
+const RACER_SPEC_SOURCES: &[SpecSource] = &[
+    SpecSource {
+        id: "chassis",
+        label: "Chassis",
+        markdown: CHASSIS_SPEC,
+    },
+    SpecSource {
+        id: "electronics",
+        label: "Electronics",
+        markdown: ELECTRONICS_SPEC,
+    },
+    SpecSource {
+        id: "emissions",
+        label: "Emissions",
+        markdown: EMISSIONS_SPEC,
+    },
+];
+
+/// One racer repo document rendered for the product page.
 pub struct SpecDocumentView {
+    pub id: String,
+    pub label: String,
     pub html: String,
 }
 
@@ -19,16 +45,14 @@ pub fn specs_for_sku(sku_code: &str) -> Vec<SpecDocumentView> {
     if sku_code != SIGMA_RACER_SKU {
         return Vec::new();
     }
-    [CHASSIS_SPEC, ELECTRONICS_SPEC, EMISSIONS_SPEC]
-        .into_iter()
-        .map(render_markdown_document)
+    RACER_SPEC_SOURCES
+        .iter()
+        .map(|source| SpecDocumentView {
+            id: source.id.to_string(),
+            label: source.label.to_string(),
+            html: render_markdown_html(source.markdown),
+        })
         .collect()
-}
-
-fn render_markdown_document(markdown: &str) -> SpecDocumentView {
-    SpecDocumentView {
-        html: render_markdown_html(markdown),
-    }
 }
 
 fn render_markdown_html(markdown: &str) -> String {
@@ -47,12 +71,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sigma_racer_has_rendered_specs() {
+    fn sigma_racer_has_three_tabbed_specs() {
         let docs = specs_for_sku("SIGMA-RACER");
         assert_eq!(docs.len(), 3);
+        assert_eq!(docs[0].id, "chassis");
+        assert_eq!(docs[0].label, "Chassis");
+        assert_eq!(docs[1].id, "electronics");
+        assert_eq!(docs[2].id, "emissions");
         assert!(docs[0].html.contains("<table"));
         assert!(docs[0].html.contains("Powertrain"));
-        assert!(docs[0].html.contains("Yamaha CP3"));
+        assert!(docs[1].html.contains("STM32"));
     }
 
     #[test]

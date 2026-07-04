@@ -84,3 +84,9 @@ fn normalize_base_url(url: &str) -> String {
     }
     url
 }
+
+/// Browser origin of the identity BFF for CSP `connect-src` (no trailing slash).
+#[must_use]
+pub fn identity_public_origin() -> String {
+    identity_public_base_url().trim_end_matches('/').to_string()
+}

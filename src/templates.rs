@@ -12,7 +12,8 @@ use sigma_theme::copyright_years;
 struct StorefrontTemplate {
     storefront_items: Vec<StorefrontRow>,
     sign_in_url: String,
-    register_url: String,
+    logout_url: String,
+    identity_base_url: String,
     copyright_years: String,
 }
 
@@ -41,7 +42,8 @@ struct ProductTemplate {
     price_display: String,
     spec_documents: Vec<SpecDocumentView>,
     sign_in_url: String,
-    register_url: String,
+    logout_url: String,
+    identity_base_url: String,
     copyright_years: String,
 }
 
@@ -239,7 +241,8 @@ pub fn render_storefront_html(
     StorefrontTemplate {
         storefront_items: storefront_rows(&listings, catalog_skus),
         sign_in_url: auth.sign_in_url,
-        register_url: auth.register_url,
+        logout_url: auth.logout_url,
+        identity_base_url: auth.identity_base_url,
         copyright_years: copyright_years(),
     }
     .render()
@@ -319,7 +322,8 @@ pub fn render_product_html(product: ProductDetail) -> Result<String, askama::Err
         price_display: product.price_display,
         spec_documents: specs_for_sku(&product.sku_code),
         sign_in_url: auth.sign_in_url,
-        register_url: auth.register_url,
+        logout_url: auth.logout_url,
+        identity_base_url: auth.identity_base_url,
         copyright_years: copyright_years(),
     }
     .render()
