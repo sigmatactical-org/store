@@ -14,7 +14,14 @@ const SIGMA_RACER_SKU: &str = "SIGMA-RACER";
 
 /// Preferred tab order; unknown documents are appended alphabetically by label.
 const SPEC_TAB_ORDER: &[&str] = &[
-    "overview", "build", "engine", "chassis", "bodywork", "electrical", "electronics", "efi",
+    "overview",
+    "build",
+    "engine",
+    "chassis",
+    "bodywork",
+    "electrical",
+    "electronics",
+    "efi",
     "emissions",
 ];
 
@@ -56,10 +63,7 @@ impl CacheState {
     fn is_fresh(&self, ttl: Duration) -> bool {
         self.documents
             .as_ref()
-            .is_some_and(|_| {
-                self.fetched_at
-                    .is_some_and(|at| at.elapsed() < ttl)
-            })
+            .is_some_and(|_| self.fetched_at.is_some_and(|at| at.elapsed() < ttl))
     }
 }
 
@@ -95,13 +99,7 @@ pub async fn specs_for_sku(sku_code: &str) -> Vec<SpecDocumentView> {
         }
     }
 
-    match fetch_racer_specs(
-        &cache.client,
-        &owner,
-        &repo,
-        &config::racer_specs_ref(),
-    )
-    .await {
+    match fetch_racer_specs(&cache.client, &owner, &repo, &config::racer_specs_ref()).await {
         Ok(documents) => {
             let mut state = cache.state.write().await;
             state.documents = Some(documents.clone());
@@ -160,7 +158,7 @@ async fn fetch_racer_specs(
         });
     }
 
-    sources.sort_by(|left, right| compare_spec_sources(left, right));
+    sources.sort_by(compare_spec_sources);
     Ok(sources
         .into_iter()
         .map(|source| SpecDocumentView {

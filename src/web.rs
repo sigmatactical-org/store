@@ -46,22 +46,19 @@ fn order_page(
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
     let path = warp::path!("products" / String / "order");
 
-    let get_order = path
-        .clone()
-        .and(warp::get())
-        .and(store.clone())
-        .and_then(|sku_code: String, store: SharedStore| async move {
+    let get_order = path.and(warp::get()).and(store.clone()).and_then(
+        |sku_code: String, store: SharedStore| async move {
             let listings = store.lock().await.list();
             let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
-            let Some(product) =
-                templates::find_order_product(&sku_code, &listings, &catalog_skus)
+            let Some(product) = templates::find_order_product(&sku_code, &listings, &catalog_skus)
             else {
                 return Err(warp::reject::not_found());
             };
             templates::render_order_html(product)
                 .map(warp::reply::html)
                 .map_err(|_| warp::reject::not_found())
-        });
+        },
+    );
 
     let post_order = path
         .and(warp::post())

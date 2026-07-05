@@ -106,9 +106,8 @@ pub fn identity_public_origin() -> String {
 pub fn racer_specs_repo() -> (String, String) {
     let value = std::env::var("STORE_RACER_SPECS_REPO")
         .unwrap_or_else(|_| "sigmatactical-org/racer".to_string());
-    parse_github_repo(&value).unwrap_or_else(|| {
-        ("sigmatactical-org".to_string(), "racer".to_string())
-    })
+    parse_github_repo(&value)
+        .unwrap_or_else(|| ("sigmatactical-org".to_string(), "racer".to_string()))
 }
 
 /// Git ref (branch, tag, or commit) for racer specs.

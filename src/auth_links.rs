@@ -111,10 +111,16 @@ mod tests {
     #[test]
     fn builds_login_with_identity_callback() {
         let links = auth_links_for_return_path("/products/SIGMA-RACER");
-        assert!(links.sign_in_url.contains("app_uri=http%3A%2F%2F127.0.0.1%3A8082%2Fproducts%2FSIGMA-RACER"));
-        assert!(links.sign_in_url.contains(
-            "redirect_uri=http%3A%2F%2F127.0.0.1%3A3000%2Fauth%2Fcallback"
-        ));
+        assert!(
+            links
+                .sign_in_url
+                .contains("app_uri=http%3A%2F%2F127.0.0.1%3A8082%2Fproducts%2FSIGMA-RACER")
+        );
+        assert!(
+            links
+                .sign_in_url
+                .contains("redirect_uri=http%3A%2F%2F127.0.0.1%3A3000%2Fauth%2Fcallback")
+        );
         assert!(links.contact_us_url.contains("/contact?return_url="));
         assert!(links.edit_profile_url.contains("/profile?return_url="));
     }
