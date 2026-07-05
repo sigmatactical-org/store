@@ -6,7 +6,7 @@ use warp::{Filter, Rejection, Reply};
 use crate::SharedStore;
 use crate::catalog;
 use crate::identity;
-use crate::model::ListingForm;
+use crate::model::{CreateOrder, ListingForm, OrderForm};
 use crate::store::StoreError;
 use crate::templates::{self, FormValues};
 
@@ -14,6 +14,7 @@ pub fn routes(
     store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
     storefront_page(store.clone())
+        .or(order_page(store.clone()))
         .or(product_page(store.clone()))
         .or(admin_page(store.clone()))
         .or(new_listing_page(store.clone()))
@@ -39,6 +40,66 @@ fn storefront_page(
         })
 }
 
+/// Order checkout: `GET/POST /products/{sku_code}/order`.
+fn order_page(
+    store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
+) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
+    let path = warp::path!("products" / String / "order");
+
+    let get_order = path
+        .clone()
+        .and(warp::get())
+        .and(store.clone())
+        .and_then(|sku_code: String, store: SharedStore| async move {
+            let listings = store.lock().await.list();
+            let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
+            let Some(product) =
+                templates::find_order_product(&sku_code, &listings, &catalog_skus)
+            else {
+                return Err(warp::reject::not_found());
+            };
+            templates::render_order_html(product)
+                .map(warp::reply::html)
+                .map_err(|_| warp::reject::not_found())
+        });
+
+    let post_order = path
+        .and(warp::post())
+        .and(warp::body::form())
+        .and(store)
+        .and_then(
+            |sku_code: String, form: OrderForm, store: SharedStore| async move {
+                let mut store = store.lock().await;
+                let listings = store.list();
+                let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
+                let Some(product) =
+                    templates::find_order_product(&sku_code, &listings, &catalog_skus)
+                else {
+                    return Err(warp::reject::not_found());
+                };
+                let username = form.username.trim().to_string();
+                if username.is_empty() {
+                    return templates::render_order_html(product)
+                        .map(warp::reply::html)
+                        .map_err(|_| warp::reject::not_found());
+                }
+                let order = store
+                    .create_order(CreateOrder {
+                        sku_code: product.sku_code.clone(),
+                        username,
+                        price_cents: product.price_cents,
+                    })
+                    .await
+                    .map_err(|_| warp::reject::not_found())?;
+                templates::render_order_confirm_html(product, &order.id)
+                    .map(warp::reply::html)
+                    .map_err(|_| warp::reject::not_found())
+            },
+        );
+
+    get_order.or(post_order)
+}
+
 /// Public product detail page: `GET /products/{sku_code}`.
 fn product_page(
     store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
@@ -53,6 +114,7 @@ fn product_page(
                 return Err(warp::reject::not_found());
             };
             templates::render_product_html(product)
+                .await
                 .map(warp::reply::html)
                 .map_err(|_| warp::reject::not_found())
         })

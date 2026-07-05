@@ -18,7 +18,7 @@ use tokio::sync::Mutex;
 use warp::Filter;
 use warp::Reply;
 
-pub use model::{CreateListing, Listing, RealmUser, UpdateListing};
+pub use model::{CreateListing, CreateOrder, Listing, Order, RealmUser, UpdateListing};
 
 /// Shared mutable listings store handle.
 pub type SharedStore = Arc<Mutex<store::ListingsStore>>;

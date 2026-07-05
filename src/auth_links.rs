@@ -5,6 +5,8 @@ pub struct AuthLinks {
     pub sign_in_url: String,
     pub logout_url: String,
     pub identity_base_url: String,
+    pub contact_us_url: String,
+    pub edit_profile_url: String,
 }
 
 /// Build login and registration URLs that return the shopper to `return_path` on the store.
@@ -27,11 +29,22 @@ pub fn auth_links_for_return_path(return_path: &str) -> AuthLinks {
         app_uri = percent_encode(&app_uri),
         logout_callback_uri = percent_encode(&logout_callback_uri),
     );
+    let contact_base = crate::config::contact_public_base_url();
+    let contact_us_url = format!(
+        "{contact_base}contact?return_url={}",
+        percent_encode(&app_uri)
+    );
+    let edit_profile_url = format!(
+        "{identity_root}/profile?return_url={}",
+        percent_encode(&app_uri)
+    );
 
     AuthLinks {
         sign_in_url,
         logout_url,
         identity_base_url: format!("{identity_root}/"),
+        contact_us_url,
+        edit_profile_url,
     }
 }
 
@@ -102,5 +115,7 @@ mod tests {
         assert!(links.sign_in_url.contains(
             "redirect_uri=http%3A%2F%2F127.0.0.1%3A3000%2Fauth%2Fcallback"
         ));
+        assert!(links.contact_us_url.contains("/contact?return_url="));
+        assert!(links.edit_profile_url.contains("/profile?return_url="));
     }
 }

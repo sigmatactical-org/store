@@ -5,7 +5,7 @@
 {% block brand %}Sigma Store{% endblock %}
 
 {% block nav_actions %}
-{% include "nav_sign_in.html" %}
+{% include "nav_store.html" %}
 {% endblock %}
 
 {% block main_class %}store-main product-page{% endblock %}
@@ -73,9 +73,14 @@
       <div class="card product-card">
         <div class="card-body">
           {% if !price_display.is_empty() %}
-          <p class="fs-3 fw-semibold mb-2 product-price">{{ price_display }}</p>
-          {% endif %}
+          <div class="d-flex flex-wrap align-items-baseline justify-content-between gap-3 mb-3">
+            <p class="fs-3 fw-semibold mb-0 product-price">{{ price_display }}</p>
+            <a class="btn btn-primary" href="{{ order_url }}">Order now</a>
+          </div>
+          <p class="text-secondary small mb-0">Hand-built to order. A 50% deposit secures your build slot.</p>
+          {% else %}
           <p class="text-secondary small mb-0">Hand-built to order. Contact Sigma Tactical Group to arrange a build.</p>
+          {% endif %}
         </div>
       </div>
     </div>
