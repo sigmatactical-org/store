@@ -2,10 +2,10 @@ use askama::Template;
 
 use crate::auth_links;
 use crate::catalog::CatalogSku;
+use crate::config;
 use crate::model::{
     Listing, RealmUser, deposit_cents_for_price, format_price_cents, price_cents_to_form,
 };
-use crate::specs::{SpecDocumentView, specs_for_sku};
 use sigma_theme::copyright_years;
 
 /// Public storefront home page: visible, catalog-backed listings only.
@@ -45,7 +45,7 @@ struct ProductTemplate {
     description_paragraphs: Vec<String>,
     price_display: String,
     order_url: String,
-    spec_documents: Vec<SpecDocumentView>,
+    details_url: Option<String>,
     sign_in_url: String,
     logout_url: String,
     identity_base_url: String,
@@ -378,7 +378,7 @@ pub fn find_order_product(
 /// # Errors
 ///
 /// Returns [`askama::Error`] when template rendering fails.
-pub async fn render_product_html(product: ProductDetail) -> Result<String, askama::Error> {
+pub fn render_product_html(product: ProductDetail) -> Result<String, askama::Error> {
     let return_path = format!("/products/{}", product.sku_code);
     let auth = auth_links::auth_links_for_return_path(&return_path);
     ProductTemplate {
@@ -392,7 +392,7 @@ pub async fn render_product_html(product: ProductDetail) -> Result<String, askam
             .unwrap_or_default(),
         price_display: product.price_display,
         order_url: format!("/products/{}/order", product.sku_code),
-        spec_documents: specs_for_sku(&product.sku_code).await,
+        details_url: config::product_details_url(&product.sku_code),
         sign_in_url: auth.sign_in_url,
         logout_url: auth.logout_url,
         identity_base_url: auth.identity_base_url,

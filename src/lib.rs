@@ -6,7 +6,6 @@ mod catalog;
 pub mod config;
 mod identity;
 mod model;
-mod specs;
 pub mod store;
 mod templates;
 mod web;

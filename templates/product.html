@@ -25,47 +25,10 @@
       <p class="product-lead">{{ paragraph }}</p>
       {% endfor %}
 
-      {% if !spec_documents.is_empty() %}
-      <section class="racer-specs" aria-label="Build specifications">
-        <header class="racer-specs__header">
-          <h2 class="racer-specs__title">Build specifications</h2>
-          <p class="racer-specs__subtitle">Technical documents from the racer repository</p>
-        </header>
-
-        <div class="racer-specs__chrome">
-          {% for doc in spec_documents %}
-          <input
-            type="radio"
-            name="racer-spec-tab"
-            id="racer-spec-{{ doc.id }}"
-            class="racer-specs__input"
-            {% if loop.first %}checked{% endif %}
-          />
-          {% endfor %}
-
-          <div class="racer-specs__tabs" role="tablist" aria-label="Specification documents">
-            {% for doc in spec_documents %}
-            <label class="racer-specs__tab" for="racer-spec-{{ doc.id }}" role="tab">
-              {{ doc.label }}
-            </label>
-            {% endfor %}
-          </div>
-
-          <div class="racer-specs__panels">
-            {% for doc in spec_documents %}
-            <article
-              class="racer-specs__panel racer-specs__panel--{{ doc.id }}"
-              role="tabpanel"
-              aria-labelledby="racer-spec-{{ doc.id }}"
-            >
-              <div class="racer-specs__markdown spec-markdown">
-                {{ doc.html|safe }}
-              </div>
-            </article>
-            {% endfor %}
-          </div>
-        </div>
-      </section>
+      {% if let Some(details_url) = details_url.as_ref() %}
+      <p class="mb-0">
+        <a class="text-decoration-none product-back" href="{{ details_url }}">Details &rarr;</a>
+      </p>
       {% endif %}
     </div>
 

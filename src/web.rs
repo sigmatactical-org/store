@@ -111,7 +111,6 @@ fn product_page(
                 return Err(warp::reject::not_found());
             };
             templates::render_product_html(product)
-                .await
                 .map(warp::reply::html)
                 .map_err(|_| warp::reject::not_found())
         })

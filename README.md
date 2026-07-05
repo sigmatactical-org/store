@@ -32,13 +32,11 @@ Shared site chrome comes from [sigma-theme](https://github.com/sigmatactical-org
 | `STORE_IDENTITY_CLIENT_SECRET` | Service-account client secret |
 | `STORE_IDENTITY_PUBLIC_URL` | Public identity BFF base URL for sign-in (e.g. `http://127.0.0.1:3000/`) |
 | `STORE_PUBLIC_BASE_URL` | Canonical store URL for login return (default `http://127.0.0.1:8082/`) |
-| `STORE_RACER_SPECS_REPO` | GitHub repo for SIGMA-RACER build specs (`owner/name`, default `sigmatactical-org/racer`) |
-| `STORE_RACER_SPECS_REF` | Git ref for racer specs (default `main`) |
-| `STORE_RACER_SPECS_CACHE_TTL_SECS` | Per-instance cache TTL in seconds (default `1800`, 30 minutes) |
+| `STORE_INFO_PUBLIC_URL` | Public info service base URL for product Details links (default `http://127.0.0.1:8080/`) |
 
 The **Sign in** button on public pages links to `{STORE_IDENTITY_PUBLIC_URL}/auth/login` with `app_uri` and `redirect_uri` set to the store. Add the store origin to identity's `IDENTITY_LOGIN_REDIRECT_APP_URIS` and `IDENTITY_REGISTRATION_RETURN_URIS` (e.g. `http://localhost:8082/*`).
 
-Build specifications for **SIGMA-RACER** are fetched at runtime from [racer](https://github.com/sigmatactical-org/racer) (GitHub API + raw markdown), rendered on the product detail page, and cached in memory for 30 minutes per store instance. SKU definitions are managed in catalog; store only controls how those SKUs appear on the storefront.
+SIGMA-RACER **Details** links to `{STORE_INFO_PUBLIC_URL}products/sigma-racer` on [sigma-info](https://github.com/sigmatactical-org/info), which hosts the tabbed build specifications fetched from [racer](https://github.com/sigmatactical-org/racer).
 
 Signed-in shoppers can place an order from the product page with a **50% deposit**. Unsigned visitors are sent through identity sign-in (or registration) and returned to the order checkout page.
 
