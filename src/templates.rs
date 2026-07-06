@@ -3,6 +3,7 @@ use askama::Template;
 use crate::catalog::CatalogSku;
 use crate::config;
 use crate::model::{Listing, RealmUser, format_price_cents, price_cents_to_form};
+use sigma_cart_nav::render_cart_nav;
 use sigma_identity_nav::{auth_links, render_auth_nav};
 use sigma_theme::copyright_years;
 
@@ -11,8 +12,7 @@ use sigma_theme::copyright_years;
 #[template(path = "index.html")]
 struct StorefrontTemplate {
     storefront_items: Vec<StorefrontRow>,
-    cart_count: u32,
-    cart_url: String,
+    cart_nav: String,
     auth_nav: String,
     contact_us_url: String,
     copyright_years: String,
@@ -43,8 +43,7 @@ struct ProductTemplate {
     description_paragraphs: Vec<String>,
     price_display: String,
     details_url: Option<String>,
-    cart_count: u32,
-    cart_url: String,
+    cart_nav: String,
     cart_add_url: String,
     auth_nav: String,
     contact_us_url: String,
@@ -250,8 +249,7 @@ pub fn render_storefront_html(
     );
     StorefrontTemplate {
         storefront_items: storefront_rows(&listings, catalog_skus),
-        cart_count,
-        cart_url: config::cart_public_base_url(),
+        cart_nav: render_cart_nav(&config::cart_public_base_url(), cart_count)?,
         auth_nav: render_auth_nav(&links)?,
         contact_us_url: links.contact_us_url,
         copyright_years: copyright_years(),
@@ -345,8 +343,7 @@ pub fn render_product_html(
             .unwrap_or_default(),
         price_display: product.price_display,
         details_url: config::product_details_url(&product.sku_code),
-        cart_count,
-        cart_url,
+        cart_nav: render_cart_nav(&cart_url, cart_count)?,
         cart_add_url,
         auth_nav: render_auth_nav(&links)?,
         contact_us_url: links.contact_us_url,
