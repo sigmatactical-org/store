@@ -23,7 +23,7 @@
   <div class="row g-3">
     {% for row in storefront_items %}
     <div class="col-md-6 col-lg-4">
-      <a class="text-decoration-none text-reset" href="/products/{{ row.sku_code }}">
+      <a class="text-decoration-none text-reset" href="{{ row.product_path }}">
         <div class="card h-100{% if row.featured %} border-primary{% endif %}">
           <div class="card-body">
             {% if row.featured %}

@@ -76,6 +76,7 @@ struct FormTemplate {
 
 pub struct StorefrontRow {
     pub sku_code: String,
+    pub product_path: String,
     pub name: String,
     pub excerpt: Option<String>,
     pub category: Option<String>,
@@ -163,6 +164,7 @@ fn storefront_rows(listings: &[Listing], skus: &[CatalogSku]) -> Vec<StorefrontR
             }
             Some(StorefrontRow {
                 sku_code: sku.sku_code.clone(),
+                product_path: crate::product_url::path(&sku.sku_code),
                 name: sku.name.clone(),
                 excerpt: sku.description.as_deref().map(excerpt),
                 category: sku.category.clone(),
@@ -311,7 +313,10 @@ pub fn find_product(
     listings: &[Listing],
     skus: &[CatalogSku],
 ) -> Option<ProductDetail> {
-    let sku = skus.iter().find(|s| s.active && s.sku_code == sku_code)?;
+    let needle = crate::product_url::slug(sku_code);
+    let sku = skus
+        .iter()
+        .find(|s| s.active && crate::product_url::slug(&s.sku_code) == needle)?;
     let listing = listings.iter().find(|l| l.visible && l.sku_id == sku.id)?;
     Some(ProductDetail {
         sku_code: sku.sku_code.clone(),
@@ -330,7 +335,7 @@ pub fn render_product_html(
     product: ProductDetail,
     cart_count: u32,
 ) -> Result<String, askama::Error> {
-    let return_path = format!("/products/{}", product.sku_code);
+    let return_path = crate::product_url::path(&product.sku_code);
     let cart_url = config::cart_public_base_url();
     let cart_add_url = format!("{cart_url}add");
     ProductTemplate {

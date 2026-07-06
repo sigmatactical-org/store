@@ -133,7 +133,7 @@ pub fn info_public_base_url() -> String {
 /// External details page URL for a storefront SKU, when available.
 #[must_use]
 pub fn product_details_url(sku_code: &str) -> Option<String> {
-    if sku_code == "SIGMA-RACER" {
+    if sku_code.eq_ignore_ascii_case("sigma-racer") {
         Some(format!(
             "{}/products/sigma-racer",
             info_public_base_url().trim_end_matches('/')

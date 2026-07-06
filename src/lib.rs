@@ -6,6 +6,7 @@ mod catalog;
 pub mod config;
 mod identity;
 mod model;
+mod product_url;
 pub mod store;
 mod templates;
 mod web;
