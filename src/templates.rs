@@ -3,20 +3,20 @@ use askama::Template;
 use crate::catalog::CatalogSku;
 use crate::config;
 use crate::model::{Listing, RealmUser, format_price_cents, price_cents_to_form};
-use sigma_identity_nav::render_app_site_nav;
+use sigma_identity_nav::{AppSiteNav, render_app_site_nav};
 use sigma_theme::copyright_years;
 
 fn site_nav(return_path: &str, cart_count: u32) -> Result<String, askama::Error> {
-    render_app_site_nav(
-        &config::identity_public_base_url(),
-        &config::store_public_base_url(),
-        &config::contact_public_base_url(),
-        &config::cart_public_base_url(),
+    render_app_site_nav(&AppSiteNav {
+        identity_base: &config::identity_public_base_url(),
+        app_base: &config::store_public_base_url(),
+        contact_base: &config::contact_public_base_url(),
+        cart_url: &config::cart_public_base_url(),
         cart_count,
         return_path,
-        true,
-        "",
-    )
+        show_contact_us: true,
+        leading_html: "",
+    })
 }
 
 /// Public storefront home page: visible, catalog-backed listings only.
@@ -75,7 +75,6 @@ struct FormTemplate {
 }
 
 pub struct StorefrontRow {
-    pub sku_code: String,
     pub product_path: String,
     pub name: String,
     pub excerpt: Option<String>,
@@ -163,7 +162,6 @@ fn storefront_rows(listings: &[Listing], skus: &[CatalogSku]) -> Vec<StorefrontR
                 return None;
             }
             Some(StorefrontRow {
-                sku_code: sku.sku_code.clone(),
                 product_path: crate::product_url::path(&sku.sku_code),
                 name: sku.name.clone(),
                 excerpt: sku.description.as_deref().map(excerpt),
