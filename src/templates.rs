@@ -2,7 +2,8 @@ use askama::Template;
 
 use crate::catalog::CatalogSku;
 use crate::config;
-use crate::model::{Listing, RealmUser, format_price_cents, price_cents_to_form};
+use crate::identity::IdentityUser;
+use crate::model::{Listing, format_price_cents, price_cents_to_form};
 use sigma_identity_nav::{AppSiteNav, render_app_site_nav};
 use sigma_theme::copyright_years;
 
@@ -35,7 +36,7 @@ struct AdminTemplate {
     admin_rows: Vec<AdminRow>,
     catalog_configured: bool,
     catalog_error: Option<String>,
-    identity_users: Vec<RealmUser>,
+    identity_users: Vec<IdentityUser>,
     identity_configured: bool,
     identity_error: Option<String>,
     message: Option<String>,
@@ -270,7 +271,7 @@ pub struct AdminPageInput<'a> {
     pub catalog_skus: &'a [CatalogSku],
     pub catalog_configured: bool,
     pub catalog_error: Option<String>,
-    pub identity_users: &'a [RealmUser],
+    pub identity_users: &'a [IdentityUser],
     pub identity_configured: bool,
     pub identity_error: Option<String>,
     pub message: Option<String>,

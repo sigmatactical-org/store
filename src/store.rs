@@ -33,7 +33,7 @@ pub struct ListingsStore {
 
 impl ListingsStore {
     pub async fn connect() -> Result<Self, StoreError> {
-        let pool = sigma_pg::connect().await?;
+        let pool = sigma_pg::connect_as("store").await?;
         Ok(Self { pool })
     }
 
@@ -67,7 +67,7 @@ impl ListingsStore {
         row.map(row_to_listing).transpose()
     }
 
-    pub async fn create(&mut self, input: CreateListing) -> Result<Listing, StoreError> {
+    pub async fn create(&self, input: CreateListing) -> Result<Listing, StoreError> {
         self.validate_sku_id(&input.sku_id, None).await?;
         let listing = Listing::new(input);
         sqlx::query(
@@ -86,7 +86,7 @@ impl ListingsStore {
         Ok(listing)
     }
 
-    pub async fn update(&mut self, id: &str, input: UpdateListing) -> Result<Listing, StoreError> {
+    pub async fn update(&self, id: &str, input: UpdateListing) -> Result<Listing, StoreError> {
         self.validate_sku_id(&input.sku_id, Some(id)).await?;
         let mut listing = self.get(id).await?.ok_or(StoreError::NotFound)?;
         listing.apply_update(input);
@@ -106,7 +106,7 @@ impl ListingsStore {
         Ok(listing)
     }
 
-    pub async fn delete(&mut self, id: &str) -> Result<(), StoreError> {
+    pub async fn delete(&self, id: &str) -> Result<(), StoreError> {
         let result = sqlx::query("DELETE FROM store.listings WHERE id = $1")
             .bind(id)
             .execute(&self.pool)
@@ -175,7 +175,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_listing() {
-        let mut store = test_store().await;
+        let store = test_store().await;
         let listing = store
             .create(CreateListing {
                 sku_id: "sku-abc".to_string(),
@@ -192,7 +192,7 @@ mod tests {
 
     #[tokio::test]
     async fn reject_duplicate_sku_id() {
-        let mut store = test_store().await;
+        let store = test_store().await;
         store
             .create(CreateListing {
                 sku_id: "sku-abc".to_string(),

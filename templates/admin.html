@@ -106,7 +106,6 @@
           <tr>
             <th>Name</th>
             <th>Email</th>
-            <th>Username</th>
           </tr>
         </thead>
         <tbody>
@@ -114,7 +113,6 @@
           <tr>
             <td>{{ user.display_name }}</td>
             <td>{% if let Some(email) = user.email.as_ref() %}{{ email }}{% else %}<span class="text-secondary">—</span>{% endif %}</td>
-            <td>{% if let Some(username) = user.username.as_ref() %}{{ username }}{% else %}<span class="text-secondary">—</span>{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>
