@@ -3,18 +3,28 @@ use askama::Template;
 use crate::catalog::CatalogSku;
 use crate::config;
 use crate::model::{Listing, RealmUser, format_price_cents, price_cents_to_form};
-use sigma_cart_nav::render_cart_nav;
-use sigma_identity_nav::{auth_links, render_auth_nav};
+use sigma_identity_nav::render_app_site_nav;
 use sigma_theme::copyright_years;
+
+fn site_nav(return_path: &str, cart_count: u32) -> Result<String, askama::Error> {
+    render_app_site_nav(
+        &config::identity_public_base_url(),
+        &config::store_public_base_url(),
+        &config::contact_public_base_url(),
+        &config::cart_public_base_url(),
+        cart_count,
+        return_path,
+        true,
+        "",
+    )
+}
 
 /// Public storefront home page: visible, catalog-backed listings only.
 #[derive(Template)]
 #[template(path = "index.html")]
 struct StorefrontTemplate {
     storefront_items: Vec<StorefrontRow>,
-    cart_nav: String,
-    auth_nav: String,
-    contact_us_url: String,
+    site_nav: String,
     copyright_years: String,
 }
 
@@ -29,6 +39,7 @@ struct AdminTemplate {
     identity_configured: bool,
     identity_error: Option<String>,
     message: Option<String>,
+    site_nav: String,
     copyright_years: String,
 }
 
@@ -43,10 +54,8 @@ struct ProductTemplate {
     description_paragraphs: Vec<String>,
     price_display: String,
     details_url: Option<String>,
-    cart_nav: String,
+    site_nav: String,
     cart_add_url: String,
-    auth_nav: String,
-    contact_us_url: String,
     copyright_years: String,
 }
 
@@ -61,6 +70,7 @@ struct FormTemplate {
     sort_order: String,
     catalog_skus: Vec<CatalogSkuRef>,
     error: Option<String>,
+    site_nav: String,
     copyright_years: String,
 }
 
@@ -219,6 +229,10 @@ fn render_form(
     error: Option<String>,
     values: FormValues,
 ) -> Result<String, askama::Error> {
+    let return_path = listing
+        .as_ref()
+        .map(|entry| format!("/admin/listings/{}/edit", entry.id))
+        .unwrap_or_else(|| "/admin/listings/new".to_string());
     FormTemplate {
         listing,
         sku_id: values.sku_id,
@@ -228,6 +242,7 @@ fn render_form(
         sort_order: values.sort_order,
         catalog_skus: catalog_sku_refs(catalog_skus),
         error,
+        site_nav: site_nav(&return_path, 0)?,
         copyright_years: copyright_years(),
     }
     .render()
@@ -241,17 +256,9 @@ pub fn render_storefront_html(
     catalog_skus: &[CatalogSku],
     cart_count: u32,
 ) -> Result<String, askama::Error> {
-    let links = auth_links(
-        &config::identity_public_base_url(),
-        &config::store_public_base_url(),
-        &config::contact_public_base_url(),
-        "/",
-    );
     StorefrontTemplate {
         storefront_items: storefront_rows(&listings, catalog_skus),
-        cart_nav: render_cart_nav(&config::cart_public_base_url(), cart_count)?,
-        auth_nav: render_auth_nav(&links)?,
-        contact_us_url: links.contact_us_url,
+        site_nav: site_nav("/", cart_count)?,
         copyright_years: copyright_years(),
     }
     .render()
@@ -281,6 +288,7 @@ pub fn render_admin_html(input: AdminPageInput<'_>) -> Result<String, askama::Er
         identity_configured: input.identity_configured,
         identity_error: input.identity_error,
         message: input.message,
+        site_nav: site_nav("/admin", 0)?,
         copyright_years: copyright_years(),
     }
     .render()
@@ -323,12 +331,6 @@ pub fn render_product_html(
     cart_count: u32,
 ) -> Result<String, askama::Error> {
     let return_path = format!("/products/{}", product.sku_code);
-    let links = auth_links(
-        &config::identity_public_base_url(),
-        &config::store_public_base_url(),
-        &config::contact_public_base_url(),
-        &return_path,
-    );
     let cart_url = config::cart_public_base_url();
     let cart_add_url = format!("{cart_url}add");
     ProductTemplate {
@@ -343,10 +345,8 @@ pub fn render_product_html(
             .unwrap_or_default(),
         price_display: product.price_display,
         details_url: config::product_details_url(&product.sku_code),
-        cart_nav: render_cart_nav(&cart_url, cart_count)?,
+        site_nav: site_nav(&return_path, cart_count)?,
         cart_add_url,
-        auth_nav: render_auth_nav(&links)?,
-        contact_us_url: links.contact_us_url,
         copyright_years: copyright_years(),
     }
     .render()
