@@ -1,7 +1,6 @@
 //! Sigma Store: public storefront and internal admin UI for catalog listings.
 
 mod api;
-mod auth_links;
 mod cart;
 mod catalog;
 pub mod config;

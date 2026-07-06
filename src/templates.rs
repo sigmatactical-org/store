@@ -1,9 +1,9 @@
 use askama::Template;
 
-use crate::auth_links;
 use crate::catalog::CatalogSku;
 use crate::config;
 use crate::model::{Listing, RealmUser, format_price_cents, price_cents_to_form};
+use sigma_identity_nav::{auth_links, render_auth_nav};
 use sigma_theme::copyright_years;
 
 /// Public storefront home page: visible, catalog-backed listings only.
@@ -13,11 +13,8 @@ struct StorefrontTemplate {
     storefront_items: Vec<StorefrontRow>,
     cart_count: u32,
     cart_url: String,
-    sign_in_url: String,
-    logout_url: String,
-    identity_base_url: String,
+    auth_nav: String,
     contact_us_url: String,
-    edit_profile_url: String,
     copyright_years: String,
 }
 
@@ -49,11 +46,8 @@ struct ProductTemplate {
     cart_count: u32,
     cart_url: String,
     cart_add_url: String,
-    sign_in_url: String,
-    logout_url: String,
-    identity_base_url: String,
+    auth_nav: String,
     contact_us_url: String,
-    edit_profile_url: String,
     copyright_years: String,
 }
 
@@ -248,16 +242,18 @@ pub fn render_storefront_html(
     catalog_skus: &[CatalogSku],
     cart_count: u32,
 ) -> Result<String, askama::Error> {
-    let auth = auth_links::auth_links_for_return_path("/");
+    let links = auth_links(
+        &config::identity_public_base_url(),
+        &config::store_public_base_url(),
+        &config::contact_public_base_url(),
+        "/",
+    );
     StorefrontTemplate {
         storefront_items: storefront_rows(&listings, catalog_skus),
         cart_count,
         cart_url: config::cart_public_base_url(),
-        sign_in_url: auth.sign_in_url,
-        logout_url: auth.logout_url,
-        identity_base_url: auth.identity_base_url,
-        contact_us_url: auth.contact_us_url,
-        edit_profile_url: auth.edit_profile_url,
+        auth_nav: render_auth_nav(&links)?,
+        contact_us_url: links.contact_us_url,
         copyright_years: copyright_years(),
     }
     .render()
@@ -329,7 +325,12 @@ pub fn render_product_html(
     cart_count: u32,
 ) -> Result<String, askama::Error> {
     let return_path = format!("/products/{}", product.sku_code);
-    let auth = auth_links::auth_links_for_return_path(&return_path);
+    let links = auth_links(
+        &config::identity_public_base_url(),
+        &config::store_public_base_url(),
+        &config::contact_public_base_url(),
+        &return_path,
+    );
     let cart_url = config::cart_public_base_url();
     let cart_add_url = format!("{cart_url}add");
     ProductTemplate {
@@ -347,11 +348,8 @@ pub fn render_product_html(
         cart_count,
         cart_url,
         cart_add_url,
-        sign_in_url: auth.sign_in_url,
-        logout_url: auth.logout_url,
-        identity_base_url: auth.identity_base_url,
-        contact_us_url: auth.contact_us_url,
-        edit_profile_url: auth.edit_profile_url,
+        auth_nav: render_auth_nav(&links)?,
+        contact_us_url: links.contact_us_url,
         copyright_years: copyright_years(),
     }
     .render()

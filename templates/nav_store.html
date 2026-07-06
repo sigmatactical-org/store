@@ -1,5 +1,5 @@
 <div class="d-flex align-items-center gap-2">
-  {% include "nav_sign_in.html" %}
+  {{ auth_nav|safe }}
   <a
     class="btn btn-outline-light btn-sm position-relative"
     href="{{ cart_url|safe }}"
