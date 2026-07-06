@@ -117,7 +117,11 @@ impl ListingsStore {
         Ok(())
     }
 
-    async fn validate_sku_id(&self, sku_id: &str, except_id: Option<&str>) -> Result<(), StoreError> {
+    async fn validate_sku_id(
+        &self,
+        sku_id: &str,
+        except_id: Option<&str>,
+    ) -> Result<(), StoreError> {
         if sku_id.trim().is_empty() {
             return Err(StoreError::SkuIdRequired);
         }
