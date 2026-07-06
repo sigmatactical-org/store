@@ -43,7 +43,7 @@ SIGMA-RACER **Details** links to `{STORE_INFO_PUBLIC_URL}products/sigma-racer` o
 
 Shoppers **Add to cart** from a product page. The button posts directly to the public [sigma-cart](https://github.com/sigmatactical-org/cart) service (`STORE_CART_PUBLIC_URL`), which owns the cart UI, the guest cart (tracked by a shared `sigma_cart` cookie), and the deposit-to-reserve checkout. The store reads that same cookie server-side (via `STORE_CART_BASE_URL`) to show a live item count in the navbar; when it is unset, the badge is simply hidden. For the cookie to be shared, the store and cart must sit on the same registrable domain (sibling subdomains in prod; the same `localhost` in dev).
 
-Identity integration requires a Keycloak client with **service accounts enabled** and the **view-users** role on **realm-management**. In the dev realm, you can reuse the `identity` client credentials and assign that role to `service-account-identity`.
+Identity integration requires a Keycloak client with **service accounts enabled** and the **view-users** role on **realm-management**. In the dev realm, run `platform/scripts/seed-keycloak-dev-users.sh` to grant `view-users` on `service-account-identity`.
 
 ## Data model
 
@@ -95,10 +95,10 @@ Run catalog and store on different ports:
 
 ```bash
 # Terminal 1 — catalog (default 8080)
-cd sigma/it/commerce/catalog && ./scripts/prepare-local.sh && cargo run -p sigma-catalog
+cd sigma/it/catalog && ./scripts/prepare-local.sh && cargo run -p sigma-catalog
 
 # Terminal 2 — cart (default 8084); point it back at the store for prices
-cd sigma/it/commerce/cart && ./scripts/prepare-local.sh
+cd sigma/it/cart && ./scripts/prepare-local.sh
 export CART_CATALOG_BASE_URL=http://127.0.0.1:8080/
 export CART_STORE_BASE_URL=http://127.0.0.1:8082/
 export CART_STORE_PUBLIC_URL=http://127.0.0.1:8082/
@@ -106,7 +106,7 @@ export CART_PUBLIC_BASE_URL=http://127.0.0.1:8084/
 PORT=8084 cargo run -p sigma-cart
 
 # Terminal 3 — store
-cd sigma/it/commerce/store && ./scripts/prepare-local.sh
+cd sigma/it/store && ./scripts/prepare-local.sh
 export STORE_CATALOG_BASE_URL=http://127.0.0.1:8080/
 export STORE_CART_BASE_URL=http://127.0.0.1:8084/
 export STORE_CART_PUBLIC_URL=http://127.0.0.1:8084/
@@ -116,10 +116,10 @@ export PORT=8082
 cargo run -p sigma-store
 ```
 
-From the sigma workspace (`sigma/it/commerce/`):
+From the sigma workspace (`sigma/it/`):
 
 ```bash
-cd sigma/it/commerce && ./scripts/prepare-local.sh
+cd sigma/it && ./scripts/prepare-commerce-local.sh
 STORE_CATALOG_BASE_URL=http://127.0.0.1:8080/ PORT=8082 cargo run -p sigma-store
 ```
 
@@ -143,7 +143,7 @@ Release is in **`.github/workflows/release.yml`** when configured. Locally:
 docker build -f Dockerfile build/image
 ```
 
-Data is stored in the shared PostgreSQL `store` schema (`store.document` JSONB table). Postgres runs in the [platform](https://github.com/sigmatactical-org/platform) kind stack — port-forward for local `cargo run`:
+Data is stored in the shared PostgreSQL `store` schema (`store.listings` JSONB table). Postgres runs in the [platform](https://github.com/sigmatactical-org/platform) kind stack — port-forward for local `cargo run`:
 
 ```bash
 cd platform && ./scripts/postgres-dev.sh port-forward-bg && ./scripts/postgres-dev.sh migrate

@@ -62,7 +62,12 @@ fn storefront_page(
         .and(warp::header::optional::<String>("cookie"))
         .and(store)
         .and_then(|cookie: Option<String>, store: SharedStore| async move {
-            let listings = store.lock().await.list();
+            let listings = store
+                .lock()
+                .await
+                .list()
+                .await
+                .map_err(|_| warp::reject::not_found())?;
             let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
             let count = cart_count(cookie.as_deref()).await;
             templates::render_storefront_html(listings, &catalog_skus, count)
@@ -81,7 +86,12 @@ fn product_page(
         .and(store)
         .and_then(
             |sku_code: String, cookie: Option<String>, store: SharedStore| async move {
-                let listings = store.lock().await.list();
+                let listings = store
+                    .lock()
+                    .await
+                    .list()
+                    .await
+                    .map_err(|_| warp::reject::not_found())?;
                 let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
                 let Some(product) = templates::find_product(&sku_code, &listings, &catalog_skus)
                 else {
@@ -105,7 +115,12 @@ fn admin_page(
         .and(warp::get())
         .and(store)
         .and_then(|store: SharedStore| async move {
-            let listings = store.lock().await.list();
+            let listings = store
+                .lock()
+                .await
+                .list()
+                .await
+                .map_err(|_| warp::reject::not_found())?;
             let catalog_result = catalog::fetch_skus().await;
             let (catalog_skus, catalog_error) = match catalog_result {
                 Ok(skus) => (Some(skus), None),
@@ -141,7 +156,12 @@ fn new_listing_page(
         .and(warp::get())
         .and(store)
         .and_then(|store: SharedStore| async move {
-            let listings = store.lock().await.list();
+            let listings = store
+                .lock()
+                .await
+                .list()
+                .await
+                .map_err(|_| warp::reject::not_found())?;
             let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
             templates::render_form_html(listings, &catalog_skus, None, None)
                 .map(warp::reply::html)
@@ -159,7 +179,7 @@ fn create_listing_form(
         .and(store)
         .and_then(|form: ListingForm, store: SharedStore| async move {
             let mut store = store.lock().await;
-            let listings = store.list();
+            let listings = store.list().await.map_err(|_| warp::reject::not_found())?;
             let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
             let values = form_to_values(&form);
             let response = match form.into_create() {
@@ -203,10 +223,12 @@ fn edit_listing_page(
         .and(store)
         .and_then(|id: String, store: SharedStore| async move {
             let store = store.lock().await;
-            let Some(listing) = store.get(&id) else {
-                return Err(warp::reject::not_found());
+            let listing = match store.get(&id).await {
+                Ok(Some(listing)) => listing,
+                Ok(None) => return Err(warp::reject::not_found()),
+                Err(_) => return Err(warp::reject::not_found()),
             };
-            let listings = store.list();
+            let listings = store.list().await.map_err(|_| warp::reject::not_found())?;
             let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
             templates::render_form_html(listings, &catalog_skus, Some(listing), None)
                 .map(warp::reply::html)
@@ -224,7 +246,7 @@ fn update_listing_form(
         .and_then(
             |id: String, form: ListingForm, store: SharedStore| async move {
                 let mut store = store.lock().await;
-                let listings = store.list();
+                let listings = store.list().await.map_err(|_| warp::reject::not_found())?;
                 let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
                 let values = form_to_values(&form);
                 let response = match form.into_update() {
@@ -232,7 +254,7 @@ fn update_listing_form(
                         if !catalog_skus.is_empty()
                             && catalog::validate_sku_id(&catalog_skus, input.sku_id.trim()).is_err()
                         {
-                            let listing = store.get(&id);
+                            let listing = store.get(&id).await.ok().flatten();
                             render_form_error(
                                 listings,
                                 &catalog_skus,
@@ -250,14 +272,14 @@ fn update_listing_form(
                                         .into_response()
                                 }
                                 Err(e) => {
-                                    let listing = store.get(&id);
+                                    let listing = store.get(&id).await.ok().flatten();
                                     render_form_error(listings, &catalog_skus, listing, values, e)
                                 }
                             }
                         }
                     }
                     Err(e) => {
-                        let listing = store.get(&id);
+                        let listing = store.get(&id).await.ok().flatten();
                         render_form_error(
                             listings,
                             &catalog_skus,
@@ -287,18 +309,21 @@ fn delete_listing_form(
                         .into_response(),
                 ),
                 Err(StoreError::NotFound) => Err(warp::reject::not_found()),
-                Err(e) => templates::render_admin_html(templates::AdminPageInput {
-                    listings: store.list(),
-                    catalog_skus: &catalog_skus,
-                    catalog_configured: crate::config::catalog_configured(),
-                    catalog_error: None,
-                    identity_users: &[],
-                    identity_configured: crate::config::identity_configured(),
-                    identity_error: None,
-                    message: Some(format!("Delete failed: {e}")),
-                })
-                .map(|html| warp::reply::html(html).into_response())
-                .map_err(|_| warp::reject::not_found()),
+                Err(e) => {
+                    let listings = store.list().await.unwrap_or_default();
+                    templates::render_admin_html(templates::AdminPageInput {
+                        listings,
+                        catalog_skus: &catalog_skus,
+                        catalog_configured: crate::config::catalog_configured(),
+                        catalog_error: None,
+                        identity_users: &[],
+                        identity_configured: crate::config::identity_configured(),
+                        identity_error: None,
+                        message: Some(format!("Delete failed: {e}")),
+                    })
+                    .map(|html| warp::reply::html(html).into_response())
+                    .map_err(|_| warp::reject::not_found())
+                }
             }
         })
 }

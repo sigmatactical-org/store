@@ -75,10 +75,13 @@ fn list_items(
         .and(warp::get())
         .and(store)
         .and_then(|store: SharedStore| async move {
-            let listings = store.lock().await.list();
+            let listings = match store.lock().await.list().await {
+                Ok(listings) => listings,
+                Err(e) => return Ok(json_error(store_error_status(&e), e.to_string())),
+            };
             let visible: Vec<Listing> = listings.into_iter().filter(|l| l.visible).collect();
             let items = enrich_listings(visible).await;
-            Ok::<_, Rejection>(warp::reply::json(&items))
+            Ok::<_, Rejection>(warp::reply::json(&items).into_response())
         })
 }
 
@@ -112,9 +115,12 @@ fn list_listings(
         .and(warp::get())
         .and(store)
         .and_then(|store: SharedStore| async move {
-            let listings = store.lock().await.list();
+            let listings = match store.lock().await.list().await {
+                Ok(listings) => listings,
+                Err(e) => return Ok(json_error(store_error_status(&e), e.to_string())),
+            };
             let items = enrich_listings(listings).await;
-            Ok::<_, Rejection>(warp::reply::json(&items))
+            Ok::<_, Rejection>(warp::reply::json(&items).into_response())
         })
 }
 
@@ -127,14 +133,16 @@ fn get_listing(
         .and(store)
         .and_then(|id: String, store: SharedStore| async move {
             let store = store.lock().await;
-            let Some(listing) = store.get(&id) else {
-                return Err(warp::reject::not_found());
+            let listing = match store.get(&id).await {
+                Ok(Some(listing)) => listing,
+                Ok(None) => return Err(warp::reject::not_found()),
+                Err(e) => return Ok(json_error(store_error_status(&e), e.to_string())),
             };
             let skus = catalog::fetch_skus().await.ok();
             let sku = skus
                 .as_ref()
                 .and_then(|all| catalog::sku_by_id(all, &listing.sku_id).cloned());
-            Ok(warp::reply::json(&StorefrontItem { listing, sku }))
+            Ok(warp::reply::json(&StorefrontItem { listing, sku }).into_response())
         })
 }
 
