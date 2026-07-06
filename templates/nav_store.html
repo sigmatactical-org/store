@@ -1,7 +1,7 @@
-<div class="d-flex align-items-center">
-  <a class="btn btn-outline-light btn-sm me-2" href="{{ contact_us_url|safe }}">Contact us</a>
+<div class="d-flex align-items-center gap-2">
+  {% include "nav_sign_in.html" %}
   <a
-    class="btn btn-outline-light btn-sm position-relative me-2"
+    class="btn btn-outline-light btn-sm position-relative"
     href="{{ cart_url|safe }}"
     aria-label="Cart{% if cart_count > 0 %} ({{ cart_count }} items){% endif %}"
   >
@@ -14,5 +14,5 @@
     <span class="badge rounded-pill text-bg-primary position-absolute top-0 start-100 translate-middle">{{ cart_count }}</span>
     {% endif %}
   </a>
-  {% include "nav_sign_in.html" %}
+  <a class="btn btn-outline-light btn-sm" href="{{ contact_us_url|safe }}">Contact us</a>
 </div>
