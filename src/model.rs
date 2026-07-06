@@ -11,57 +11,6 @@ pub struct RealmUser {
     pub username: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum OrderStatus {
-    PendingDeposit,
-}
-
-/// Customer order placed from the public storefront.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Order {
-    pub id: String,
-    pub sku_code: String,
-    pub username: String,
-    pub price_cents: u64,
-    pub deposit_cents: u64,
-    pub status: OrderStatus,
-    pub created_at: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct CreateOrder {
-    pub sku_code: String,
-    pub username: String,
-    pub price_cents: u64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct OrderForm {
-    pub username: String,
-}
-
-impl Order {
-    pub fn new(input: CreateOrder) -> Self {
-        let deposit_cents = deposit_cents_for_price(input.price_cents);
-        Self {
-            id: uuid::Uuid::new_v4().to_string(),
-            sku_code: input.sku_code,
-            username: input.username.trim().to_string(),
-            price_cents: input.price_cents,
-            deposit_cents,
-            status: OrderStatus::PendingDeposit,
-            created_at: chrono::Utc::now().to_rfc3339(),
-        }
-    }
-}
-
-/// Deposit required at order time (50% of list price).
-#[must_use]
-pub fn deposit_cents_for_price(price_cents: u64) -> u64 {
-    price_cents / 2
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Listing {
     pub id: String,
@@ -233,11 +182,5 @@ mod tests {
         assert_eq!(format_price_cents(Some(17_500_000)), "$175,000.00");
         assert_eq!(format_price_cents(Some(100)), "$1.00");
         assert_eq!(format_price_cents(None), "");
-    }
-
-    #[test]
-    fn deposit_is_half_of_list_price() {
-        assert_eq!(deposit_cents_for_price(17_500_000), 8_750_000);
-        assert_eq!(deposit_cents_for_price(1999), 999);
     }
 }

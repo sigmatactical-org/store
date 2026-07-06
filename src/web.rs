@@ -4,17 +4,22 @@ use warp::http::StatusCode;
 use warp::{Filter, Rejection, Reply};
 
 use crate::SharedStore;
+use crate::cart;
 use crate::catalog;
 use crate::identity;
-use crate::model::{CreateOrder, ListingForm, OrderForm};
+use crate::model::ListingForm;
 use crate::store::StoreError;
 use crate::templates::{self, FormValues};
+
+/// Cookie tying a browser to its guest cart. Owned by the cart service and
+/// shared with the store (same host in dev, shared parent domain in prod) so
+/// the store can render a live item count.
+const CART_COOKIE: &str = "sigma_cart";
 
 pub fn routes(
     store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
     storefront_page(store.clone())
-        .or(order_page(store.clone()))
         .or(product_page(store.clone()))
         .or(admin_page(store.clone()))
         .or(new_listing_page(store.clone()))
@@ -24,77 +29,46 @@ pub fn routes(
         .or(delete_listing_form(store))
 }
 
+/// Extract the guest cart id from the request `Cookie` header, if present.
+fn cart_id_from_cookie(cookie_header: Option<&str>) -> Option<String> {
+    cookie_header?.split(';').find_map(|pair| {
+        let (name, value) = pair.split_once('=')?;
+        (name.trim() == CART_COOKIE)
+            .then(|| value.trim().to_string())
+            .filter(|v| !v.is_empty())
+    })
+}
+
+/// Total item count for the nav cart badge (0 when there is no live cart).
+async fn cart_count(cookie_header: Option<&str>) -> u32 {
+    if !crate::config::cart_configured() {
+        return 0;
+    }
+    let Some(cart_id) = cart_id_from_cookie(cookie_header) else {
+        return 0;
+    };
+    match cart::get_cart(&cart_id).await {
+        Ok(Some(detail)) => detail.item_count(),
+        _ => 0,
+    }
+}
+
 /// Public storefront: `GET /`. Visible, catalog-backed listings only.
 fn storefront_page(
     store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
     warp::path::end()
         .and(warp::get())
+        .and(warp::header::optional::<String>("cookie"))
         .and(store)
-        .and_then(|store: SharedStore| async move {
+        .and_then(|cookie: Option<String>, store: SharedStore| async move {
             let listings = store.lock().await.list();
             let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
-            templates::render_storefront_html(listings, &catalog_skus)
+            let count = cart_count(cookie.as_deref()).await;
+            templates::render_storefront_html(listings, &catalog_skus, count)
                 .map(warp::reply::html)
                 .map_err(|_| warp::reject::not_found())
         })
-}
-
-/// Order checkout: `GET/POST /products/{sku_code}/order`.
-fn order_page(
-    store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
-) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
-    let path = warp::path!("products" / String / "order");
-
-    let get_order = path.and(warp::get()).and(store.clone()).and_then(
-        |sku_code: String, store: SharedStore| async move {
-            let listings = store.lock().await.list();
-            let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
-            let Some(product) = templates::find_order_product(&sku_code, &listings, &catalog_skus)
-            else {
-                return Err(warp::reject::not_found());
-            };
-            templates::render_order_html(product)
-                .map(warp::reply::html)
-                .map_err(|_| warp::reject::not_found())
-        },
-    );
-
-    let post_order = path
-        .and(warp::post())
-        .and(warp::body::form())
-        .and(store)
-        .and_then(
-            |sku_code: String, form: OrderForm, store: SharedStore| async move {
-                let mut store = store.lock().await;
-                let listings = store.list();
-                let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
-                let Some(product) =
-                    templates::find_order_product(&sku_code, &listings, &catalog_skus)
-                else {
-                    return Err(warp::reject::not_found());
-                };
-                let username = form.username.trim().to_string();
-                if username.is_empty() {
-                    return templates::render_order_html(product)
-                        .map(warp::reply::html)
-                        .map_err(|_| warp::reject::not_found());
-                }
-                let order = store
-                    .create_order(CreateOrder {
-                        sku_code: product.sku_code.clone(),
-                        username,
-                        price_cents: product.price_cents,
-                    })
-                    .await
-                    .map_err(|_| warp::reject::not_found())?;
-                templates::render_order_confirm_html(product, &order.id)
-                    .map(warp::reply::html)
-                    .map_err(|_| warp::reject::not_found())
-            },
-        );
-
-    get_order.or(post_order)
 }
 
 /// Public product detail page: `GET /products/{sku_code}`.
@@ -103,17 +77,22 @@ fn product_page(
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
     warp::path!("products" / String)
         .and(warp::get())
+        .and(warp::header::optional::<String>("cookie"))
         .and(store)
-        .and_then(|sku_code: String, store: SharedStore| async move {
-            let listings = store.lock().await.list();
-            let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
-            let Some(product) = templates::find_product(&sku_code, &listings, &catalog_skus) else {
-                return Err(warp::reject::not_found());
-            };
-            templates::render_product_html(product)
-                .map(warp::reply::html)
-                .map_err(|_| warp::reject::not_found())
-        })
+        .and_then(
+            |sku_code: String, cookie: Option<String>, store: SharedStore| async move {
+                let listings = store.lock().await.list();
+                let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
+                let Some(product) = templates::find_product(&sku_code, &listings, &catalog_skus)
+                else {
+                    return Err(warp::reject::not_found());
+                };
+                let count = cart_count(cookie.as_deref()).await;
+                templates::render_product_html(product, count)
+                    .map(warp::reply::html)
+                    .map_err(|_| warp::reject::not_found())
+            },
+        )
 }
 
 /// Internal admin dashboard: `GET /admin`. Intended to be reached only through

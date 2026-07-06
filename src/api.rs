@@ -37,8 +37,6 @@ fn store_error_status(err: &StoreError) -> StatusCode {
         StoreError::SkuIdRequired
         | StoreError::DuplicateSkuId
         | StoreError::SkuNotInCatalog(_)
-        | StoreError::PriceRequired
-        | StoreError::UsernameRequired
         | StoreError::InvalidInput(_) => StatusCode::BAD_REQUEST,
         StoreError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }

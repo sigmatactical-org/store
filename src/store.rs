@@ -1,7 +1,7 @@
 use sqlx::PgPool;
 use thiserror::Error;
 
-use crate::model::{CreateListing, CreateOrder, Listing, Order, UpdateListing};
+use crate::model::{CreateListing, Listing, UpdateListing};
 
 const SCHEMA: &str = "store";
 
@@ -17,10 +17,6 @@ pub enum StoreError {
     SkuNotInCatalog(String),
     #[error("database error: {0}")]
     Database(#[from] anyhow::Error),
-    #[error("price is required to place an order")]
-    PriceRequired,
-    #[error("username is required")]
-    UsernameRequired,
     #[error("{0}")]
     InvalidInput(String),
 }
@@ -28,8 +24,6 @@ pub enum StoreError {
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 struct Database {
     listings: Vec<Listing>,
-    #[serde(default)]
-    orders: Vec<Order>,
 }
 
 #[derive(Debug, Clone)]
@@ -107,24 +101,6 @@ impl ListingsStore {
             .ok_or(StoreError::NotFound)?;
         self.db.listings.remove(index);
         self.persist().await
-    }
-
-    pub async fn create_order(&mut self, input: CreateOrder) -> Result<Order, StoreError> {
-        if input.username.trim().is_empty() {
-            return Err(StoreError::UsernameRequired);
-        }
-        if input.price_cents == 0 {
-            return Err(StoreError::PriceRequired);
-        }
-        let order = Order::new(input);
-        self.db.orders.push(order.clone());
-        self.persist().await?;
-        Ok(order)
-    }
-
-    #[must_use]
-    pub fn get_order(&self, id: &str) -> Option<Order> {
-        self.db.orders.iter().find(|order| order.id == id).cloned()
     }
 
     fn validate_sku_id(&self, sku_id: &str, except_id: Option<&str>) -> Result<(), StoreError> {

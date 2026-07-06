@@ -25,6 +25,39 @@ pub fn catalog_configured() -> bool {
     catalog_base_url().is_some()
 }
 
+/// Base URL of the cart service over the mesh, used server-side to read the
+/// live item count for the navbar badge (e.g. `http://127.0.0.1:8084/`).
+#[must_use]
+pub fn cart_base_url() -> Option<String> {
+    std::env::var("STORE_CART_BASE_URL")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| normalize_base_url(&s))
+}
+
+/// Whether cart integration is configured.
+#[must_use]
+pub fn cart_configured() -> bool {
+    cart_base_url().is_some()
+}
+
+/// Public base URL of the cart service, where the browser is sent to add items
+/// and view the cart (e.g. `http://127.0.0.1:8084/`).
+#[must_use]
+pub fn cart_public_base_url() -> String {
+    std::env::var("STORE_CART_PUBLIC_URL")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| normalize_base_url(&s))
+        .unwrap_or_else(|| "http://127.0.0.1:8084/".to_string())
+}
+
+/// Browser origin of the cart service for CSP `form-action` (no trailing slash).
+#[must_use]
+pub fn cart_public_origin() -> String {
+    cart_public_base_url().trim_end_matches('/').to_string()
+}
+
 /// Public base URL of the contact service for the storefront contact form.
 #[must_use]
 pub fn contact_public_base_url() -> String {

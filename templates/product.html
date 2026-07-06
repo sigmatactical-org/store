@@ -38,9 +38,12 @@
           {% if !price_display.is_empty() %}
           <div class="d-flex flex-wrap align-items-baseline justify-content-between gap-3 mb-3">
             <p class="fs-3 fw-semibold mb-0 product-price">{{ price_display }}</p>
-            <a class="btn btn-primary" href="{{ order_url }}">Order now</a>
+            <form method="post" action="{{ cart_add_url|safe }}" class="mb-0">
+              <input type="hidden" name="sku_id" value="{{ sku_id }}" />
+              <button type="submit" class="btn btn-primary">Add to cart</button>
+            </form>
           </div>
-          <p class="text-secondary small mb-0">Hand-built to order. A 50% deposit secures your build slot.</p>
+          <p class="text-secondary small mb-0">Hand-built to order. A 50% deposit secures your build slot at checkout.</p>
           {% else %}
           <p class="text-secondary small mb-0">Hand-built to order. Contact Sigma Tactical Group to arrange a build.</p>
           {% endif %}

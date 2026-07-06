@@ -8,12 +8,13 @@ Shared site chrome comes from [sigma-theme](https://github.com/sigmatactical-org
 
 ## Public vs internal
 
-- **Public** (`sigmatactical.store`): `GET /` (storefront browse) and `GET /products/{sku_code}` (product detail). No admin data is rendered on these pages.
+- **Public** (`sigmatactical.store`): `GET /` (storefront browse) and `GET /products/{sku_code}` (product detail). The cart itself is a separate public service — [sigma-cart](https://github.com/sigmatactical-org/cart) — that this store adds items to. No admin data is rendered on these pages.
 - **Internal / admin only**: `GET /admin` (listing management + identity users) and the `/listings/*` CRUD pages. These are not linked from the public pages and, like [sigma-catalog](https://github.com/sigmatactical-org/catalog), [sigma-cart](https://github.com/sigmatactical-org/cart), and [sigma-contact](https://github.com/sigmatactical-org/contact), are intended to be reached only through the [sigma-identity](https://github.com/sigmatactical-org/identity) authenticated proxy in production — not exposed on the public domain.
 
 ## Features
 
 - **Catalog integration** — fetch SKUs from sigma-catalog at request time
+- **Cart integration** — Add to cart from the product page posts directly to the public [sigma-cart](https://github.com/sigmatactical-org/cart) service, which owns the cart UI; the store shows a live item count in the navbar (read server-side from the shared `sigma_cart` cookie)
 - **Identity integration** — fetch realm users from the identity provider (Keycloak Admin API)
 - **Storefront listings** — link catalog SKUs to the storefront with price, visibility, featured flag, and sort order
 - **Public web UI** — browse the storefront and view product detail pages
@@ -27,6 +28,8 @@ Shared site chrome comes from [sigma-theme](https://github.com/sigmatactical-org
 | `PORT` | Listen port (default `8080`) |
 | `DATABASE_URL` | PostgreSQL connection URL (default `postgres://sigma:sigma@127.0.0.1:5432/sigma`) |
 | `STORE_CATALOG_BASE_URL` | Catalog service root (e.g. `http://127.0.0.1:8080/`) |
+| `STORE_CART_BASE_URL` | Cart service root over the mesh (e.g. `http://127.0.0.1:8084/`); enables the server-side navbar badge count |
+| `STORE_CART_PUBLIC_URL` | Public cart service URL the browser is sent to for Add to cart and the cart link (default `http://127.0.0.1:8084/`) |
 | `STORE_IDENTITY_ISSUER_URL` | OIDC issuer / realm URL (e.g. `http://127.0.0.1:8101/realms/multcorp`) |
 | `STORE_IDENTITY_CLIENT_ID` | Service-account client id for Admin API |
 | `STORE_IDENTITY_CLIENT_SECRET` | Service-account client secret |
@@ -38,7 +41,7 @@ The **Sign in** button on public pages links to `{STORE_IDENTITY_PUBLIC_URL}/aut
 
 SIGMA-RACER **Details** links to `{STORE_INFO_PUBLIC_URL}products/sigma-racer` on [sigma-info](https://github.com/sigmatactical-org/info), which hosts the tabbed build specifications fetched from [racer](https://github.com/sigmatactical-org/racer).
 
-Signed-in shoppers can place an order from the product page with a **50% deposit**. Unsigned visitors are sent through identity sign-in (or registration) and returned to the order checkout page.
+Shoppers **Add to cart** from a product page. The button posts directly to the public [sigma-cart](https://github.com/sigmatactical-org/cart) service (`STORE_CART_PUBLIC_URL`), which owns the cart UI, the guest cart (tracked by a shared `sigma_cart` cookie), and the deposit-to-reserve checkout. The store reads that same cookie server-side (via `STORE_CART_BASE_URL`) to show a live item count in the navbar; when it is unset, the badge is simply hidden. For the cookie to be shared, the store and cart must sit on the same registrable domain (sibling subdomains in prod; the same `localhost` in dev).
 
 Identity integration requires a Keycloak client with **service accounts enabled** and the **view-users** role on **realm-management**. In the dev realm, you can reuse the `identity` client credentials and assign that role to `service-account-identity`.
 
@@ -92,21 +95,31 @@ Run catalog and store on different ports:
 
 ```bash
 # Terminal 1 — catalog (default 8080)
-cd sigma/commerce/catalog && ./scripts/prepare-local.sh && cargo run -p sigma-catalog
+cd sigma/it/commerce/catalog && ./scripts/prepare-local.sh && cargo run -p sigma-catalog
 
-# Terminal 2 — store
-cd sigma/commerce/store && ./scripts/prepare-local.sh
+# Terminal 2 — cart (default 8084); point it back at the store for prices
+cd sigma/it/commerce/cart && ./scripts/prepare-local.sh
+export CART_CATALOG_BASE_URL=http://127.0.0.1:8080/
+export CART_STORE_BASE_URL=http://127.0.0.1:8082/
+export CART_STORE_PUBLIC_URL=http://127.0.0.1:8082/
+export CART_PUBLIC_BASE_URL=http://127.0.0.1:8084/
+PORT=8084 cargo run -p sigma-cart
+
+# Terminal 3 — store
+cd sigma/it/commerce/store && ./scripts/prepare-local.sh
 export STORE_CATALOG_BASE_URL=http://127.0.0.1:8080/
+export STORE_CART_BASE_URL=http://127.0.0.1:8084/
+export STORE_CART_PUBLIC_URL=http://127.0.0.1:8084/
 export STORE_IDENTITY_PUBLIC_URL=http://127.0.0.1:3000/
 export STORE_PUBLIC_BASE_URL=http://127.0.0.1:8082/
 export PORT=8082
 cargo run -p sigma-store
 ```
 
-From the sigma workspace (`sigma/commerce/`):
+From the sigma workspace (`sigma/it/commerce/`):
 
 ```bash
-cd sigma/commerce && ./scripts/prepare-local.sh
+cd sigma/it/commerce && ./scripts/prepare-local.sh
 STORE_CATALOG_BASE_URL=http://127.0.0.1:8080/ PORT=8082 cargo run -p sigma-store
 ```
 

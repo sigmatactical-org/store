@@ -3,9 +3,7 @@ use askama::Template;
 use crate::auth_links;
 use crate::catalog::CatalogSku;
 use crate::config;
-use crate::model::{
-    Listing, RealmUser, deposit_cents_for_price, format_price_cents, price_cents_to_form,
-};
+use crate::model::{Listing, RealmUser, format_price_cents, price_cents_to_form};
 use sigma_theme::copyright_years;
 
 /// Public storefront home page: visible, catalog-backed listings only.
@@ -13,6 +11,8 @@ use sigma_theme::copyright_years;
 #[template(path = "index.html")]
 struct StorefrontTemplate {
     storefront_items: Vec<StorefrontRow>,
+    cart_count: u32,
+    cart_url: String,
     sign_in_url: String,
     logout_url: String,
     identity_base_url: String,
@@ -40,45 +40,15 @@ struct AdminTemplate {
 #[template(path = "product.html")]
 struct ProductTemplate {
     sku_code: String,
+    sku_id: String,
     name: String,
     category: Option<String>,
     description_paragraphs: Vec<String>,
     price_display: String,
-    order_url: String,
     details_url: Option<String>,
-    sign_in_url: String,
-    logout_url: String,
-    identity_base_url: String,
-    contact_us_url: String,
-    edit_profile_url: String,
-    copyright_years: String,
-}
-
-/// Order checkout page for a storefront product.
-#[derive(Template)]
-#[template(path = "order.html")]
-struct OrderTemplate {
-    sku_code: String,
-    name: String,
-    price_display: String,
-    deposit_display: String,
-    sign_in_url: String,
-    logout_url: String,
-    identity_base_url: String,
-    contact_us_url: String,
-    edit_profile_url: String,
-    copyright_years: String,
-}
-
-/// Order confirmation page after a deposit order is placed.
-#[derive(Template)]
-#[template(path = "order_confirm.html")]
-struct OrderConfirmTemplate {
-    sku_code: String,
-    name: String,
-    price_display: String,
-    deposit_display: String,
-    order_id: String,
+    cart_count: u32,
+    cart_url: String,
+    cart_add_url: String,
     sign_in_url: String,
     logout_url: String,
     identity_base_url: String,
@@ -276,10 +246,13 @@ fn render_form(
 pub fn render_storefront_html(
     listings: Vec<Listing>,
     catalog_skus: &[CatalogSku],
+    cart_count: u32,
 ) -> Result<String, askama::Error> {
     let auth = auth_links::auth_links_for_return_path("/");
     StorefrontTemplate {
         storefront_items: storefront_rows(&listings, catalog_skus),
+        cart_count,
+        cart_url: config::cart_public_base_url(),
         sign_in_url: auth.sign_in_url,
         logout_url: auth.logout_url,
         identity_base_url: auth.identity_base_url,
@@ -322,20 +295,11 @@ pub fn render_admin_html(input: AdminPageInput<'_>) -> Result<String, askama::Er
 /// A single storefront item resolved for the product detail page.
 pub struct ProductDetail {
     pub sku_code: String,
+    pub sku_id: String,
     pub name: String,
     pub category: Option<String>,
     pub description: Option<String>,
-    pub price_cents: Option<u64>,
     pub price_display: String,
-}
-
-/// Product context for the order checkout page.
-pub struct OrderPageDetail {
-    pub sku_code: String,
-    pub name: String,
-    pub price_cents: u64,
-    pub price_display: String,
-    pub deposit_display: String,
 }
 
 /// Resolve a visible, active product by its catalog SKU code.
@@ -349,40 +313,28 @@ pub fn find_product(
     let listing = listings.iter().find(|l| l.visible && l.sku_id == sku.id)?;
     Some(ProductDetail {
         sku_code: sku.sku_code.clone(),
+        sku_id: sku.id.clone(),
         name: sku.name.clone(),
         category: sku.category.clone(),
         description: sku.description.clone(),
-        price_cents: listing.price_cents,
         price_display: format_price_cents(listing.price_cents),
-    })
-}
-
-/// Resolve a visible, active product for ordering (requires a list price).
-#[must_use]
-pub fn find_order_product(
-    sku_code: &str,
-    listings: &[Listing],
-    skus: &[CatalogSku],
-) -> Option<OrderPageDetail> {
-    let product = find_product(sku_code, listings, skus)?;
-    let price_cents = product.price_cents.filter(|price| *price > 0)?;
-    Some(OrderPageDetail {
-        sku_code: product.sku_code,
-        name: product.name,
-        price_display: product.price_display,
-        deposit_display: format_price_cents(Some(deposit_cents_for_price(price_cents))),
-        price_cents,
     })
 }
 
 /// # Errors
 ///
 /// Returns [`askama::Error`] when template rendering fails.
-pub fn render_product_html(product: ProductDetail) -> Result<String, askama::Error> {
+pub fn render_product_html(
+    product: ProductDetail,
+    cart_count: u32,
+) -> Result<String, askama::Error> {
     let return_path = format!("/products/{}", product.sku_code);
     let auth = auth_links::auth_links_for_return_path(&return_path);
+    let cart_url = config::cart_public_base_url();
+    let cart_add_url = format!("{cart_url}add");
     ProductTemplate {
         sku_code: product.sku_code.clone(),
+        sku_id: product.sku_id,
         name: product.name,
         category: product.category,
         description_paragraphs: product
@@ -391,54 +343,10 @@ pub fn render_product_html(product: ProductDetail) -> Result<String, askama::Err
             .map(description_paragraphs)
             .unwrap_or_default(),
         price_display: product.price_display,
-        order_url: format!("/products/{}/order", product.sku_code),
         details_url: config::product_details_url(&product.sku_code),
-        sign_in_url: auth.sign_in_url,
-        logout_url: auth.logout_url,
-        identity_base_url: auth.identity_base_url,
-        contact_us_url: auth.contact_us_url,
-        edit_profile_url: auth.edit_profile_url,
-        copyright_years: copyright_years(),
-    }
-    .render()
-}
-
-/// # Errors
-///
-/// Returns [`askama::Error`] when template rendering fails.
-pub fn render_order_html(product: OrderPageDetail) -> Result<String, askama::Error> {
-    let return_path = format!("/products/{}/order", product.sku_code);
-    let auth = auth_links::auth_links_for_return_path(&return_path);
-    OrderTemplate {
-        sku_code: product.sku_code,
-        name: product.name,
-        price_display: product.price_display,
-        deposit_display: product.deposit_display,
-        sign_in_url: auth.sign_in_url,
-        logout_url: auth.logout_url,
-        identity_base_url: auth.identity_base_url,
-        contact_us_url: auth.contact_us_url,
-        edit_profile_url: auth.edit_profile_url,
-        copyright_years: copyright_years(),
-    }
-    .render()
-}
-
-/// # Errors
-///
-/// Returns [`askama::Error`] when template rendering fails.
-pub fn render_order_confirm_html(
-    product: OrderPageDetail,
-    order_id: &str,
-) -> Result<String, askama::Error> {
-    let return_path = format!("/products/{}", product.sku_code);
-    let auth = auth_links::auth_links_for_return_path(&return_path);
-    OrderConfirmTemplate {
-        sku_code: product.sku_code,
-        name: product.name,
-        price_display: product.price_display,
-        deposit_display: product.deposit_display,
-        order_id: order_id.to_string(),
+        cart_count,
+        cart_url,
+        cart_add_url,
         sign_in_url: auth.sign_in_url,
         logout_url: auth.logout_url,
         identity_base_url: auth.identity_base_url,

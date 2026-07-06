@@ -2,6 +2,7 @@
 
 mod api;
 mod auth_links;
+mod cart;
 mod catalog;
 pub mod config;
 mod identity;
@@ -17,7 +18,7 @@ use tokio::sync::Mutex;
 use warp::Filter;
 use warp::Reply;
 
-pub use model::{CreateListing, CreateOrder, Listing, Order, RealmUser, UpdateListing};
+pub use model::{CreateListing, Listing, RealmUser, UpdateListing};
 
 /// Shared mutable listings store handle.
 pub type SharedStore = Arc<Mutex<store::ListingsStore>>;
@@ -41,10 +42,11 @@ fn with_store(
 
 fn content_security_policy() -> String {
     let identity_origin = config::identity_public_origin();
+    let cart_origin = config::cart_public_origin();
     format!(
         "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; \
          img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; \
-         font-src 'self'; connect-src 'self' {identity_origin}; form-action 'self'"
+         font-src 'self'; connect-src 'self' {identity_origin}; form-action 'self' {cart_origin}"
     )
 }
 
