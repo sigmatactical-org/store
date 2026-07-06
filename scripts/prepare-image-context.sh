@@ -12,5 +12,6 @@ if [[ ! -f "$BIN" ]]; then
 fi
 
 mkdir -p "$ROOT/build/image"
+rm -f "$ROOT/build/image/sigma-store"
 cp "$BIN" "$ROOT/build/image/sigma-store"
 chmod 555 "$ROOT/build/image/sigma-store"

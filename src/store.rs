@@ -46,6 +46,11 @@ impl ListingsStore {
         Ok(store)
     }
 
+    #[must_use]
+    pub fn pool(&self) -> &PgPool {
+        &self.pool
+    }
+
     pub async fn list(&self) -> Result<Vec<Listing>, StoreError> {
         let rows = sqlx::query(
             "SELECT id, sku_id, price_cents, featured, visible, sort_order, updated_at \
