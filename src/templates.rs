@@ -6,6 +6,11 @@ use crate::identity::IdentityUser;
 use crate::model::{Listing, format_price_cents, price_cents_to_form};
 use sigma_identity_nav::{AppSiteNav, render_app_site_nav};
 use sigma_theme::copyright_years;
+use sigma_theme::nav::{Breadcrumb, SiteHeader};
+
+fn page_header(brand: &str) -> SiteHeader {
+    SiteHeader::new(brand)
+}
 
 fn site_nav(return_path: &str, cart_count: u32) -> Result<String, askama::Error> {
     render_app_site_nav(&AppSiteNav {
@@ -25,6 +30,7 @@ fn site_nav(return_path: &str, cart_count: u32) -> Result<String, askama::Error>
 #[template(path = "index.html")]
 struct StorefrontTemplate {
     storefront_items: Vec<StorefrontRow>,
+    site_header: SiteHeader,
     site_nav: String,
     copyright_years: String,
 }
@@ -40,6 +46,7 @@ struct AdminTemplate {
     identity_configured: bool,
     identity_error: Option<String>,
     message: Option<String>,
+    site_header: SiteHeader,
     site_nav: String,
     copyright_years: String,
 }
@@ -55,6 +62,7 @@ struct ProductTemplate {
     description_paragraphs: Vec<String>,
     price_display: String,
     details_url: Option<String>,
+    site_header: SiteHeader,
     site_nav: String,
     cart_add_url: String,
     copyright_years: String,
@@ -71,6 +79,7 @@ struct FormTemplate {
     sort_order: String,
     catalog_skus: Vec<CatalogSkuRef>,
     error: Option<String>,
+    site_header: SiteHeader,
     site_nav: String,
     copyright_years: String,
 }
@@ -234,6 +243,11 @@ fn render_form(
         .as_ref()
         .map(|entry| format!("/admin/listings/{}/edit", entry.id))
         .unwrap_or_else(|| "/admin/listings/new".to_string());
+    let form_crumb = if listing.is_some() {
+        "Edit listing"
+    } else {
+        "New listing"
+    };
     FormTemplate {
         listing,
         sku_id: values.sku_id,
@@ -243,6 +257,9 @@ fn render_form(
         sort_order: values.sort_order,
         catalog_skus: catalog_sku_refs(catalog_skus),
         error,
+        site_header: page_header("Sigma Store")
+            .with_breadcrumb(Breadcrumb::link("/admin", "Admin"))
+            .with_breadcrumb(Breadcrumb::current(form_crumb)),
         site_nav: site_nav(&return_path, 0)?,
         copyright_years: copyright_years(),
     }
@@ -259,6 +276,7 @@ pub fn render_storefront_html(
 ) -> Result<String, askama::Error> {
     StorefrontTemplate {
         storefront_items: storefront_rows(&listings, catalog_skus),
+        site_header: page_header("Sigma Store"),
         site_nav: site_nav("/", cart_count)?,
         copyright_years: copyright_years(),
     }
@@ -289,6 +307,7 @@ pub fn render_admin_html(input: AdminPageInput<'_>) -> Result<String, askama::Er
         identity_configured: input.identity_configured,
         identity_error: input.identity_error,
         message: input.message,
+        site_header: page_header("Sigma Store").with_breadcrumb(Breadcrumb::current("Admin")),
         site_nav: site_nav("/admin", 0)?,
         copyright_years: copyright_years(),
     }
@@ -337,6 +356,7 @@ pub fn render_product_html(
     let return_path = crate::product_url::path(&product.sku_code);
     let cart_url = config::cart_public_base_url();
     let cart_add_url = format!("{cart_url}add");
+    let product_name = product.name.clone();
     ProductTemplate {
         sku_code: product.sku_code.clone(),
         sku_id: product.sku_id,
@@ -349,6 +369,9 @@ pub fn render_product_html(
             .unwrap_or_default(),
         price_display: product.price_display,
         details_url: config::product_details_url(&product.sku_code),
+        site_header: page_header("Sigma Store")
+            .with_breadcrumb(Breadcrumb::link("/", "Store"))
+            .with_breadcrumb(Breadcrumb::current(product_name)),
         site_nav: site_nav(&return_path, cart_count)?,
         cart_add_url,
         copyright_years: copyright_years(),

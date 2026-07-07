@@ -2,18 +2,11 @@
 
 {% block title %}{{ name }} — Sigma Store{% endblock %}
 
-{% block brand %}Sigma Store{% endblock %}
-
-{% block nav_actions %}
-{{ site_nav|safe }}
-{% endblock %}
 
 {% block main_class %}store-main product-page{% endblock %}
 
 {% block content %}
 <div class="container py-4">
-  <p class="mb-3"><a class="text-decoration-none product-back" href="/">&larr; Back to store</a></p>
-
   <div class="row g-4 align-items-start">
     <div class="col-lg-8">
       {% if let Some(category) = category.as_ref() %}
