@@ -82,6 +82,7 @@ mod tests {
     use warp::http::StatusCode;
 
     async fn test_store() -> store::ListingsStore {
+        sigma_pg::clients::internal::ensure_test_internal_token();
         store::ListingsStore::connect_empty()
             .await
             .expect("PostgreSQL required for tests")
@@ -146,6 +147,10 @@ mod tests {
             .method("GET")
             .path("/listings")
             .header("accept", "application/json")
+            .header(
+                "x-sigma-internal-token",
+                sigma_pg::clients::internal::TEST_INTERNAL_TOKEN,
+            )
             .reply(&routes(test_store().await))
             .await;
         assert_eq!(res.status(), StatusCode::OK);
@@ -159,6 +164,7 @@ mod tests {
             .method("POST")
             .path("/listings")
             .header("content-type", "application/json")
+            .header("x-sigma-internal-token", sigma_pg::clients::internal::TEST_INTERNAL_TOKEN)
             .body(
                 r#"{"sku_id":"abc-123","price_cents":1999,"featured":true,"visible":true,"sort_order":0}"#,
             )
@@ -176,6 +182,10 @@ mod tests {
             .method("GET")
             .path("/items")
             .header("accept", "application/json")
+            .header(
+                "x-sigma-internal-token",
+                sigma_pg::clients::internal::TEST_INTERNAL_TOKEN,
+            )
             .reply(&routes(test_store().await))
             .await;
         assert_eq!(res.status(), StatusCode::OK);
@@ -189,6 +199,10 @@ mod tests {
             .method("GET")
             .path("/users")
             .header("accept", "application/json")
+            .header(
+                "x-sigma-internal-token",
+                sigma_pg::clients::internal::TEST_INTERNAL_TOKEN,
+            )
             .reply(&routes(test_store().await))
             .await;
         assert_eq!(res.status(), StatusCode::SERVICE_UNAVAILABLE);
