@@ -1,5 +1,7 @@
 //! Sigma Store: public storefront and internal admin UI for catalog listings.
 
+#![forbid(unsafe_code)]
+
 mod api;
 mod cart;
 mod catalog;
