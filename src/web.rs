@@ -16,6 +16,7 @@ use crate::templates::{self, FormValues};
 /// the store can render a live item count.
 const CART_COOKIE: &str = "sigma_cart";
 
+/// Build this module's routes.
 pub fn routes(
     store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {

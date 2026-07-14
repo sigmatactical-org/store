@@ -1,68 +1,11 @@
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Listing {
-    pub id: String,
-    pub sku_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub price_cents: Option<u64>,
-    pub featured: bool,
-    pub visible: bool,
-    pub sort_order: u32,
-    pub updated_at: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct CreateListing {
-    pub sku_id: String,
-    pub price_cents: Option<u64>,
-    #[serde(default)]
-    pub featured: Option<bool>,
-    #[serde(default)]
-    pub visible: Option<bool>,
-    #[serde(default)]
-    pub sort_order: Option<u32>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct UpdateListing {
-    pub sku_id: String,
-    pub price_cents: Option<u64>,
-    pub featured: bool,
-    pub visible: bool,
-    pub sort_order: u32,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ListingForm {
-    pub sku_id: String,
-    pub price: String,
-    pub featured: Option<String>,
-    pub visible: Option<String>,
-    pub sort_order: String,
-}
-
-impl ListingForm {
-    pub fn into_create(self) -> Result<CreateListing, String> {
-        Ok(CreateListing {
-            sku_id: self.sku_id,
-            price_cents: parse_price_cents(&self.price)?,
-            featured: Some(self.featured.is_some()),
-            visible: Some(self.visible.is_some()),
-            sort_order: parse_sort_order(&self.sort_order)?,
-        })
-    }
-
-    pub fn into_update(self) -> Result<UpdateListing, String> {
-        Ok(UpdateListing {
-            sku_id: self.sku_id,
-            price_cents: parse_price_cents(&self.price)?,
-            featured: self.featured.is_some(),
-            visible: self.visible.is_some(),
-            sort_order: parse_sort_order(&self.sort_order)?.unwrap_or(0),
-        })
-    }
-}
+mod create_listing;
+mod listing;
+mod listing_form;
+mod update_listing;
+pub use create_listing::CreateListing;
+pub use listing::Listing;
+pub use listing_form::ListingForm;
+pub use update_listing::UpdateListing;
 
 fn parse_price_cents(value: &str) -> Result<Option<u64>, String> {
     let trimmed = value.trim();
@@ -99,30 +42,6 @@ fn parse_sort_order(value: &str) -> Result<Option<u32>, String> {
         .parse()
         .map(Some)
         .map_err(|_| "sort order must be a non-negative integer".to_string())
-}
-
-impl Listing {
-    pub fn new(input: CreateListing) -> Self {
-        let now = chrono::Utc::now().to_rfc3339();
-        Self {
-            id: uuid::Uuid::new_v4().to_string(),
-            sku_id: input.sku_id.trim().to_string(),
-            price_cents: input.price_cents,
-            featured: input.featured.unwrap_or(false),
-            visible: input.visible.unwrap_or(true),
-            sort_order: input.sort_order.unwrap_or(0),
-            updated_at: now,
-        }
-    }
-
-    pub fn apply_update(&mut self, input: UpdateListing) {
-        self.sku_id = input.sku_id.trim().to_string();
-        self.price_cents = input.price_cents;
-        self.featured = input.featured;
-        self.visible = input.visible;
-        self.sort_order = input.sort_order;
-        self.updated_at = chrono::Utc::now().to_rfc3339();
-    }
 }
 
 #[must_use]

@@ -1,30 +1,10 @@
+mod store_error;
+pub use store_error::StoreError;
+
 use chrono::{DateTime, Utc};
 use sqlx::{PgPool, Row};
-use thiserror::Error;
 
 use crate::model::{CreateListing, Listing, UpdateListing};
-
-#[derive(Debug, Error)]
-pub enum StoreError {
-    #[error("listing not found")]
-    NotFound,
-    #[error("sku_id is required")]
-    SkuIdRequired,
-    #[error("listing for this catalog sku already exists")]
-    DuplicateSkuId,
-    #[error("catalog sku not found: {0}")]
-    SkuNotInCatalog(String),
-    #[error("database error: {0}")]
-    Database(#[from] anyhow::Error),
-    #[error("{0}")]
-    InvalidInput(String),
-}
-
-impl From<sqlx::Error> for StoreError {
-    fn from(err: sqlx::Error) -> Self {
-        Self::Database(err.into())
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct ListingsStore {

@@ -1,3 +1,8 @@
+mod error_body;
+mod storefront_item;
+pub(crate) use error_body::ErrorBody;
+pub(crate) use storefront_item::StorefrontItem;
+
 use std::convert::Infallible;
 
 use warp::http::StatusCode;
@@ -5,21 +10,10 @@ use warp::reply::Response;
 use warp::{Filter, Rejection, Reply};
 
 use crate::SharedStore;
-use crate::catalog::{self, CatalogSku};
+use crate::catalog::{self};
 use crate::identity;
 use crate::model::{CreateListing, Listing, UpdateListing};
 use crate::store::StoreError;
-
-#[derive(serde::Serialize)]
-struct ErrorBody {
-    error: String,
-}
-
-#[derive(serde::Serialize)]
-struct StorefrontItem {
-    listing: Listing,
-    sku: Option<CatalogSku>,
-}
 
 fn json_error(status: StatusCode, message: impl Into<String>) -> Response {
     warp::reply::with_status(
@@ -84,6 +78,7 @@ async fn require_catalog_sku(sku_id: &str) -> Result<(), Response> {
     })
 }
 
+/// Build this module's routes.
 pub fn routes(
     store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {

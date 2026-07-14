@@ -1,8 +1,28 @@
+mod admin_page_input;
+mod admin_row;
+mod admin_template;
+mod catalog_sku_ref;
+mod form_template;
+mod form_values;
+mod product_detail;
+mod product_template;
+mod storefront_row;
+mod storefront_template;
+pub use admin_page_input::AdminPageInput;
+pub use admin_row::AdminRow;
+pub(crate) use admin_template::AdminTemplate;
+pub use catalog_sku_ref::CatalogSkuRef;
+pub(crate) use form_template::FormTemplate;
+pub use form_values::FormValues;
+pub use product_detail::ProductDetail;
+pub(crate) use product_template::ProductTemplate;
+pub use storefront_row::StorefrontRow;
+pub(crate) use storefront_template::StorefrontTemplate;
+
 use askama::Template;
 
 use crate::catalog::CatalogSku;
 use crate::config;
-use crate::identity::IdentityUser;
 use crate::model::{Listing, format_price_cents, price_cents_to_form};
 use sigma_theme::copyright_years;
 use sigma_theme::nav::{Breadcrumb, SiteHeader};
@@ -24,98 +44,6 @@ fn site_nav(return_path: &str, cart_count: u32) -> Result<String, askama::Error>
         show_contact_us: false,
         leading_html: "",
     })
-}
-
-/// Public storefront home page: visible, catalog-backed listings only.
-#[derive(Template)]
-#[template(path = "index.html")]
-struct StorefrontTemplate {
-    storefront_items: Vec<StorefrontRow>,
-    site_header: SiteHeader,
-    site_nav: String,
-    copyright_years: String,
-}
-
-/// Internal admin dashboard: listing management + identity users + config status.
-#[derive(Template)]
-#[template(path = "admin.html")]
-struct AdminTemplate {
-    admin_rows: Vec<AdminRow>,
-    catalog_configured: bool,
-    catalog_error: Option<String>,
-    identity_users: Vec<IdentityUser>,
-    identity_configured: bool,
-    identity_error: Option<String>,
-    message: Option<String>,
-    site_header: SiteHeader,
-    site_nav: String,
-    copyright_years: String,
-}
-
-/// Public product detail page for a single storefront item.
-#[derive(Template)]
-#[template(path = "product.html")]
-struct ProductTemplate {
-    sku_code: String,
-    sku_id: String,
-    name: String,
-    category: Option<String>,
-    description_paragraphs: Vec<String>,
-    price_display: String,
-    details_url: Option<String>,
-    site_header: SiteHeader,
-    site_nav: String,
-    cart_add_url: String,
-    copyright_years: String,
-}
-
-#[derive(Template)]
-#[template(path = "form.html")]
-struct FormTemplate {
-    listing: Option<Listing>,
-    sku_id: String,
-    price: String,
-    featured: bool,
-    visible: bool,
-    sort_order: String,
-    catalog_skus: Vec<CatalogSkuRef>,
-    error: Option<String>,
-    site_header: SiteHeader,
-    site_nav: String,
-    copyright_years: String,
-}
-
-pub struct StorefrontRow {
-    pub product_path: String,
-    pub name: String,
-    pub excerpt: Option<String>,
-    pub category: Option<String>,
-    pub price_display: String,
-    pub featured: bool,
-}
-
-pub struct AdminRow {
-    pub listing: Listing,
-    pub sku_code: String,
-    pub name: String,
-    pub price_display: String,
-    pub visible_label: String,
-    pub featured_label: String,
-    pub missing_catalog: bool,
-}
-
-pub struct CatalogSkuRef {
-    pub id: String,
-    pub sku_code: String,
-    pub name: String,
-}
-
-pub struct FormValues {
-    pub sku_id: String,
-    pub price: String,
-    pub featured: bool,
-    pub visible: bool,
-    pub sort_order: String,
 }
 
 const EXCERPT_MAX_LEN: usize = 220;
@@ -284,18 +212,6 @@ pub fn render_storefront_html(
     .render()
 }
 
-/// Inputs for rendering the admin dashboard page.
-pub struct AdminPageInput<'a> {
-    pub listings: Vec<Listing>,
-    pub catalog_skus: &'a [CatalogSku],
-    pub catalog_configured: bool,
-    pub catalog_error: Option<String>,
-    pub identity_users: &'a [IdentityUser],
-    pub identity_configured: bool,
-    pub identity_error: Option<String>,
-    pub message: Option<String>,
-}
-
 /// # Errors
 ///
 /// Returns [`askama::Error`] when template rendering fails.
@@ -313,16 +229,6 @@ pub fn render_admin_html(input: AdminPageInput<'_>) -> Result<String, askama::Er
         copyright_years: copyright_years(),
     }
     .render()
-}
-
-/// A single storefront item resolved for the product detail page.
-pub struct ProductDetail {
-    pub sku_code: String,
-    pub sku_id: String,
-    pub name: String,
-    pub category: Option<String>,
-    pub description: Option<String>,
-    pub price_display: String,
 }
 
 /// Resolve a visible, active product by its catalog SKU code.
