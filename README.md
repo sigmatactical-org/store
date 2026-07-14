@@ -1,5 +1,8 @@
 # sigma-store
 
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+[![MSRV](https://img.shields.io/badge/MSRV-1.97.0-blue.svg)](https://www.rust-lang.org)
+
 Public storefront for Sigma Tactical Group. Pulls product SKUs from the catalog service, manages storefront listings locally, and exposes a customer-facing web UI, an internal admin UI, plus a JSON API.
 
 Repository: https://github.com/sigmatactical-org/store

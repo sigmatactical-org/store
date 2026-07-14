@@ -21,7 +21,7 @@ fn site_nav(return_path: &str, cart_count: u32) -> Result<String, askama::Error>
         cart_count,
         return_path,
         show_cart: true,
-        show_contact_us: true,
+        show_contact_us: false,
         leading_html: "",
     })
 }
