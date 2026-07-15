@@ -25,11 +25,11 @@ use crate::catalog::CatalogSku;
 use crate::config;
 use crate::model::{Listing, format_price_cents, price_cents_to_form};
 use sigma_theme::copyright_years;
-use sigma_theme::nav::{Breadcrumb, SiteHeader};
+use sigma_theme::nav::{Breadcrumb, SiteHeader, SiteMenuSection, site_menu};
 use sigma_theme::site_nav::{AppSiteNav, render_app_site_nav};
 
-fn page_header(brand: &str) -> SiteHeader {
-    SiteHeader::new(brand)
+fn page_header() -> SiteHeader {
+    SiteHeader::new().with_menu(site_menu(Some(SiteMenuSection::Store)))
 }
 
 fn site_nav(return_path: &str, cart_count: u32) -> Result<String, askama::Error> {
@@ -186,7 +186,7 @@ fn render_form(
         sort_order: values.sort_order,
         catalog_skus: catalog_sku_refs(catalog_skus),
         error,
-        site_header: page_header("Sigma Store")
+        site_header: page_header()
             .with_breadcrumb(Breadcrumb::link("/admin", "Admin"))
             .with_breadcrumb(Breadcrumb::current(form_crumb)),
         site_nav: site_nav(&return_path, 0)?,
@@ -205,7 +205,7 @@ pub fn render_storefront_html(
 ) -> Result<String, askama::Error> {
     StorefrontTemplate {
         storefront_items: storefront_rows(&listings, catalog_skus),
-        site_header: page_header("Sigma Store"),
+        site_header: page_header(),
         site_nav: site_nav("/", cart_count)?,
         copyright_years: copyright_years(),
     }
@@ -224,7 +224,7 @@ pub fn render_admin_html(input: AdminPageInput<'_>) -> Result<String, askama::Er
         identity_configured: input.identity_configured,
         identity_error: input.identity_error,
         message: input.message,
-        site_header: page_header("Sigma Store").with_breadcrumb(Breadcrumb::current("Admin")),
+        site_header: page_header().with_breadcrumb(Breadcrumb::current("Admin")),
         site_nav: site_nav("/admin", 0)?,
         copyright_years: copyright_years(),
     }
@@ -276,7 +276,7 @@ pub fn render_product_html(
             .unwrap_or_default(),
         price_display: product.price_display,
         details_url: config::product_details_url(&product.sku_code),
-        site_header: page_header("Sigma Store")
+        site_header: page_header()
             .with_breadcrumb(Breadcrumb::link("/", "Store"))
             .with_breadcrumb(Breadcrumb::current(product_name)),
         site_nav: site_nav(&return_path, cart_count)?,
