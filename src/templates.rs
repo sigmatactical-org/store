@@ -29,7 +29,7 @@ use sigma_theme::nav::{Breadcrumb, SiteHeader, SiteMenuSection, site_menu};
 use sigma_theme::site_nav::{AppSiteNav, render_app_site_nav};
 
 fn page_header() -> SiteHeader {
-    SiteHeader::new().with_menu(site_menu(Some(SiteMenuSection::Store)))
+    SiteHeader::new("Store").with_menu(site_menu(Some(SiteMenuSection::Store)))
 }
 
 fn site_nav(return_path: &str, cart_count: u32) -> Result<String, askama::Error> {
