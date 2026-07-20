@@ -1,8 +1,5 @@
 //! [`ProductDetail`].
 
-#[allow(unused_imports)]
-use super::*;
-
 /// A single storefront item resolved for the product detail page.
 pub struct ProductDetail {
     pub sku_code: String,

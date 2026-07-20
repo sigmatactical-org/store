@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 
-{% block title %}{% if listing.is_some() %}Edit listing{% else %}New listing{% endif %} — Sigma Store{% endblock %}
+{% block title %}{% if listing_id.is_some() %}Edit listing{% else %}New listing{% endif %} — Sigma Store{% endblock %}
 
 
 {% block main_class %}store-main{% endblock %}
 
 {% block content %}
 <div class="container py-4">
-  <h1>{% if listing.is_some() %}Edit listing{% else %}Add listing{% endif %}</h1>
+  <h1>{% if listing_id.is_some() %}Edit listing{% else %}Add listing{% endif %}</h1>
   <p class="text-secondary">Link a catalog SKU to the store with price, visibility, and display order.</p>
 
   {% if let Some(err) = error %}
   <div class="alert alert-danger" role="alert">{{ err }}</div>
   {% endif %}
 
-  <form method="post" action="{% if let Some(l) = listing.as_ref() %}/listings/{{ l.id }}/edit{% else %}/listings{% endif %}" class="col-lg-8">
+  <form method="post" action="{% if let Some(id) = listing_id.as_ref() %}/listings/{{ id }}/edit{% else %}/listings{% endif %}" class="col-lg-8">
     <div class="mb-3">
       <label for="sku_id" class="form-label">Catalog SKU</label>
       {% if catalog_skus.is_empty() %}

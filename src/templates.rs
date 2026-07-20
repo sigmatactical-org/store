@@ -19,6 +19,8 @@ pub(crate) use product_template::ProductTemplate;
 pub use storefront_row::StorefrontRow;
 pub(crate) use storefront_template::StorefrontTemplate;
 
+use std::collections::HashMap;
+
 use askama::Template;
 
 use crate::catalog::CatalogSku;
@@ -48,6 +50,11 @@ fn site_nav(return_path: &str, cart_count: u32) -> Result<String, askama::Error>
 
 const EXCERPT_MAX_LEN: usize = 220;
 
+/// Timestamp rendering for the admin table (the model keeps `DateTime<Utc>`).
+fn format_timestamp(timestamp: chrono::DateTime<chrono::Utc>) -> String {
+    timestamp.to_rfc3339()
+}
+
 fn catalog_sku_refs(skus: &[CatalogSku]) -> Vec<CatalogSkuRef> {
     skus.iter()
         .filter(|s| s.active)
@@ -59,8 +66,9 @@ fn catalog_sku_refs(skus: &[CatalogSku]) -> Vec<CatalogSkuRef> {
         .collect()
 }
 
-fn resolve_sku<'a>(skus: &'a [CatalogSku], sku_id: &str) -> Option<&'a CatalogSku> {
-    skus.iter().find(|s| s.id == sku_id)
+/// Index SKUs by id so row building is O(n + m) instead of a scan per listing.
+fn skus_by_id(skus: &[CatalogSku]) -> HashMap<&str, &CatalogSku> {
+    skus.iter().map(|s| (s.id.as_str(), s)).collect()
 }
 
 /// First paragraph (or a truncated slice) of a description, for grid cards.
@@ -92,11 +100,12 @@ fn description_paragraphs(description: &str) -> Vec<String> {
 }
 
 fn storefront_rows(listings: &[Listing], skus: &[CatalogSku]) -> Vec<StorefrontRow> {
+    let by_id = skus_by_id(skus);
     listings
         .iter()
         .filter(|l| l.visible)
         .filter_map(|listing| {
-            let sku = resolve_sku(skus, &listing.sku_id)?;
+            let sku = by_id.get(listing.sku_id.as_str())?;
             if !sku.active {
                 return None;
             }
@@ -113,29 +122,24 @@ fn storefront_rows(listings: &[Listing], skus: &[CatalogSku]) -> Vec<StorefrontR
 }
 
 fn admin_rows(listings: &[Listing], skus: &[CatalogSku]) -> Vec<AdminRow> {
+    let by_id = skus_by_id(skus);
     listings
         .iter()
         .map(|listing| {
-            let sku = resolve_sku(skus, &listing.sku_id);
+            let sku = by_id.get(listing.sku_id.as_str());
             let (sku_code, name) = match sku {
                 Some(s) => (s.sku_code.clone(), s.name.clone()),
                 None => (listing.sku_id.clone(), "—".to_string()),
             };
             AdminRow {
-                listing: listing.clone(),
+                id: listing.id.clone(),
                 sku_code,
                 name,
                 price_display: format_price_cents(listing.price_cents),
-                visible_label: if listing.visible {
-                    "Yes".to_string()
-                } else {
-                    "No".to_string()
-                },
-                featured_label: if listing.featured {
-                    "Yes".to_string()
-                } else {
-                    "No".to_string()
-                },
+                visible_label: if listing.visible { "Yes" } else { "No" },
+                featured_label: if listing.featured { "Yes" } else { "No" },
+                sort_order: listing.sort_order,
+                updated_at: format_timestamp(listing.updated_at),
                 missing_catalog: sku.is_none(),
             }
         })
@@ -178,7 +182,7 @@ fn render_form(
         "New listing"
     };
     FormTemplate {
-        listing,
+        listing_id: listing.map(|entry| entry.id),
         sku_id: values.sku_id,
         price: values.price,
         featured: values.featured,
@@ -199,12 +203,12 @@ fn render_form(
 ///
 /// Returns [`askama::Error`] when template rendering fails.
 pub fn render_storefront_html(
-    listings: Vec<Listing>,
+    listings: &[Listing],
     catalog_skus: &[CatalogSku],
     cart_count: u32,
 ) -> Result<String, askama::Error> {
     StorefrontTemplate {
-        storefront_items: storefront_rows(&listings, catalog_skus),
+        storefront_items: storefront_rows(listings, catalog_skus),
         site_header: page_header(),
         site_nav: site_nav("/", cart_count)?,
         copyright_years: copyright_years(),
@@ -217,7 +221,7 @@ pub fn render_storefront_html(
 /// Returns [`askama::Error`] when template rendering fails.
 pub fn render_admin_html(input: AdminPageInput<'_>) -> Result<String, askama::Error> {
     AdminTemplate {
-        admin_rows: admin_rows(&input.listings, input.catalog_skus),
+        admin_rows: admin_rows(input.listings, input.catalog_skus),
         catalog_configured: input.catalog_configured,
         catalog_error: input.catalog_error,
         identity_users: input.identity_users.to_vec(),
@@ -290,7 +294,6 @@ pub fn render_product_html(
 ///
 /// Returns [`askama::Error`] when template rendering fails.
 pub fn render_form_html(
-    _listings: Vec<Listing>,
     catalog_skus: &[CatalogSku],
     listing: Option<Listing>,
     error: Option<String>,
@@ -306,7 +309,6 @@ pub fn render_form_html(
 ///
 /// Returns [`askama::Error`] when template rendering fails.
 pub fn render_form_html_with_values(
-    _listings: Vec<Listing>,
     catalog_skus: &[CatalogSku],
     listing: Option<Listing>,
     error: Option<String>,

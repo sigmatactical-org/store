@@ -1,8 +1,5 @@
 //! [`StorefrontRow`].
 
-#[allow(unused_imports)]
-use super::*;
-
 /// One rendered table row.
 pub struct StorefrontRow {
     pub product_path: String,

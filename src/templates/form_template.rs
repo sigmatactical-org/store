@@ -1,15 +1,15 @@
 //! [`FormTemplate`].
 
-#[allow(unused_imports)]
-use super::*;
-use crate::model::Listing;
 use askama::Template;
 use sigma_theme::nav::SiteHeader;
+
+use super::CatalogSkuRef;
 
 #[derive(Template)]
 #[template(path = "form.html")]
 pub(crate) struct FormTemplate {
-    pub(crate) listing: Option<Listing>,
+    /// `Some` when editing an existing listing (drives the form action).
+    pub(crate) listing_id: Option<String>,
     pub(crate) sku_id: String,
     pub(crate) price: String,
     pub(crate) featured: bool,

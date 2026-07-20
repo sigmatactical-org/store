@@ -1,10 +1,10 @@
 //! [`AdminTemplate`].
 
-#[allow(unused_imports)]
-use super::*;
 use crate::identity::IdentityUser;
 use askama::Template;
 use sigma_theme::nav::SiteHeader;
+
+use super::AdminRow;
 
 /// Internal admin dashboard: listing management + identity users + config status.
 #[derive(Template)]

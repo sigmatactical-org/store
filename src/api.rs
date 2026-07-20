@@ -1,69 +1,25 @@
-mod error_body;
 mod storefront_item;
-pub(crate) use error_body::ErrorBody;
 pub(crate) use storefront_item::StorefrontItem;
 
 use std::convert::Infallible;
 
+use sigma_pg::api::{internal_auth, json_error, store_error_status};
 use warp::http::StatusCode;
 use warp::reply::Response;
 use warp::{Filter, Rejection, Reply};
 
 use crate::SharedStore;
-use crate::catalog::{self};
+use crate::catalog::{self, CatalogSku};
 use crate::identity;
 use crate::model::{CreateListing, Listing, UpdateListing};
 use crate::store::StoreError;
 
-fn json_error(status: StatusCode, message: impl Into<String>) -> Response {
-    warp::reply::with_status(
-        warp::reply::json(&ErrorBody {
-            error: message.into(),
-        }),
-        status,
-    )
-    .into_response()
-}
-
-fn store_error_status(err: &StoreError) -> StatusCode {
-    match err {
-        StoreError::NotFound => StatusCode::NOT_FOUND,
-        StoreError::SkuIdRequired
-        | StoreError::DuplicateSkuId
-        | StoreError::SkuNotInCatalog(_)
-        | StoreError::InvalidInput(_) => StatusCode::BAD_REQUEST,
-        StoreError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
-    }
-}
-
-fn internal_auth()
--> impl Filter<Extract = (Option<String>, Option<String>), Error = Rejection> + Clone {
-    warp::header::optional::<String>("authorization")
-        .and(warp::header::optional::<String>("x-sigma-internal-token"))
-}
-
-fn ensure_internal(
-    authorization: Option<String>,
-    internal_token: Option<String>,
-) -> Result<(), Rejection> {
-    if sigma_pg::clients::internal::authorize_internal(
-        authorization.as_deref(),
-        internal_token.as_deref(),
-    ) {
-        Ok(())
-    } else {
-        Err(warp::reject::not_found())
-    }
-}
-
-async fn enrich_listings(listings: Vec<Listing>) -> Vec<StorefrontItem> {
-    let skus = catalog::fetch_skus().await.ok();
+/// Merge listings with their catalog SKUs (missing/unfetched SKUs stay `None`).
+fn enrich_listings(listings: Vec<Listing>, skus: Option<&[CatalogSku]>) -> Vec<StorefrontItem> {
     listings
         .into_iter()
         .map(|listing| {
-            let sku = skus
-                .as_ref()
-                .and_then(|all| catalog::sku_by_id(all, &listing.sku_id).cloned());
+            let sku = skus.and_then(|all| catalog::sku_by_id(all, &listing.sku_id).cloned());
             StorefrontItem { listing, sku }
         })
         .collect()
@@ -83,7 +39,7 @@ pub fn routes(
     store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
     list_items(store.clone())
-        .or(list_users(store.clone()))
+        .or(list_users())
         .or(list_listings(store.clone()))
         .or(get_listing(store.clone()))
         .or(create_listing(store.clone()))
@@ -99,29 +55,26 @@ fn list_items(
         .and(warp::get())
         .and(internal_auth())
         .and(store)
-        .and_then(
-            |authorization, internal_token, store: SharedStore| async move {
-                ensure_internal(authorization, internal_token)?;
-                let listings = match store.list().await {
-                    Ok(listings) => listings,
-                    Err(e) => return Ok(json_error(store_error_status(&e), e.to_string())),
-                };
-                let visible: Vec<Listing> = listings.into_iter().filter(|l| l.visible).collect();
-                let items = enrich_listings(visible).await;
-                Ok::<_, Rejection>(warp::reply::json(&items).into_response())
-            },
-        )
+        .and_then(|store: SharedStore| async move {
+            let (listings, skus) = tokio::join!(store.list(), catalog::fetch_skus());
+            let listings = match listings {
+                Ok(listings) => listings,
+                Err(e) => return Ok(json_error(store_error_status(&e), e.to_string())),
+            };
+            let visible: Vec<Listing> = listings.into_iter().filter(|l| l.visible).collect();
+            let skus = skus.ok();
+            let items = enrich_listings(visible, skus.as_deref().map(Vec::as_slice));
+            Ok::<_, Rejection>(warp::reply::json(&items).into_response())
+        })
 }
 
-fn list_users(
-    _store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
-) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
+fn list_users() -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static
+{
     warp::path("users")
         .and(warp::path::end())
         .and(warp::get())
         .and(internal_auth())
-        .and_then(|authorization, internal_token| async move {
-            ensure_internal(authorization, internal_token)?;
+        .and_then(|| async move {
             let response = match identity::fetch_users().await {
                 Ok(users) => warp::reply::json(&users).into_response(),
                 Err(e) => json_error(
@@ -145,17 +98,16 @@ fn list_listings(
         .and(warp::get())
         .and(internal_auth())
         .and(store)
-        .and_then(
-            |authorization, internal_token, store: SharedStore| async move {
-                ensure_internal(authorization, internal_token)?;
-                let listings = match store.list().await {
-                    Ok(listings) => listings,
-                    Err(e) => return Ok(json_error(store_error_status(&e), e.to_string())),
-                };
-                let items = enrich_listings(listings).await;
-                Ok::<_, Rejection>(warp::reply::json(&items).into_response())
-            },
-        )
+        .and_then(|store: SharedStore| async move {
+            let (listings, skus) = tokio::join!(store.list(), catalog::fetch_skus());
+            let listings = match listings {
+                Ok(listings) => listings,
+                Err(e) => return Ok(json_error(store_error_status(&e), e.to_string())),
+            };
+            let skus = skus.ok();
+            let items = enrich_listings(listings, skus.as_deref().map(Vec::as_slice));
+            Ok::<_, Rejection>(warp::reply::json(&items).into_response())
+        })
 }
 
 fn get_listing(
@@ -166,21 +118,15 @@ fn get_listing(
         .and(warp::get())
         .and(internal_auth())
         .and(store)
-        .and_then(
-            |id: String, authorization, internal_token, store: SharedStore| async move {
-                ensure_internal(authorization, internal_token)?;
-                let listing = match store.get(&id).await {
-                    Ok(Some(listing)) => listing,
-                    Ok(None) => return Err(warp::reject::not_found()),
-                    Err(e) => return Ok(json_error(store_error_status(&e), e.to_string())),
-                };
-                let skus = catalog::fetch_skus().await.ok();
-                let sku = skus
-                    .as_ref()
-                    .and_then(|all| catalog::sku_by_id(all, &listing.sku_id).cloned());
-                Ok(warp::reply::json(&StorefrontItem { listing, sku }).into_response())
-            },
-        )
+        .and_then(|id: String, store: SharedStore| async move {
+            let listing = match store.get(&id).await {
+                Ok(Some(listing)) => listing,
+                Ok(None) => return Err(warp::reject::not_found()),
+                Err(e) => return Ok(json_error(store_error_status(&e), e.to_string())),
+            };
+            let sku = catalog::fetch_sku(&listing.sku_id).await.ok().flatten();
+            Ok(warp::reply::json(&StorefrontItem { listing, sku }).into_response())
+        })
 }
 
 fn create_listing(
@@ -192,22 +138,19 @@ fn create_listing(
         .and(warp::body::json())
         .and(internal_auth())
         .and(store)
-        .and_then(
-            |input: CreateListing, authorization, internal_token, store: SharedStore| async move {
-                ensure_internal(authorization, internal_token)?;
-                if let Err(resp) = require_catalog_sku(input.sku_id.trim()).await {
-                    return Ok(resp);
+        .and_then(|input: CreateListing, store: SharedStore| async move {
+            if let Err(resp) = require_catalog_sku(input.sku_id.trim()).await {
+                return Ok(resp);
+            }
+            let response = match store.create(input).await {
+                Ok(listing) => {
+                    warp::reply::with_status(warp::reply::json(&listing), StatusCode::CREATED)
+                        .into_response()
                 }
-                let response = match store.create(input).await {
-                    Ok(listing) => {
-                        warp::reply::with_status(warp::reply::json(&listing), StatusCode::CREATED)
-                            .into_response()
-                    }
-                    Err(e) => json_error(store_error_status(&e), e.to_string()),
-                };
-                Ok::<_, Rejection>(response)
-            },
-        )
+                Err(e) => json_error(store_error_status(&e), e.to_string()),
+            };
+            Ok::<_, Rejection>(response)
+        })
 }
 
 fn update_listing(
@@ -220,18 +163,13 @@ fn update_listing(
         .and(internal_auth())
         .and(store)
         .and_then(
-            |id: String,
-             input: UpdateListing,
-             authorization,
-             internal_token,
-             store: SharedStore| async move {
-                ensure_internal(authorization, internal_token)?;
+            |id: String, input: UpdateListing, store: SharedStore| async move {
                 if let Err(resp) = require_catalog_sku(input.sku_id.trim()).await {
                     return Ok(resp);
                 }
                 let response = match store.update(&id, input).await {
                     Ok(listing) => warp::reply::json(&listing).into_response(),
-                    Err(StoreError::NotFound) => return Err(warp::reject::not_found()),
+                    Err(StoreError::NotFound(_)) => return Err(warp::reject::not_found()),
                     Err(e) => json_error(store_error_status(&e), e.to_string()),
                 };
                 Ok(response)
@@ -247,16 +185,14 @@ fn delete_listing(
         .and(warp::delete())
         .and(internal_auth())
         .and(store)
-        .and_then(
-            |id: String, authorization, internal_token, store: SharedStore| async move {
-                ensure_internal(authorization, internal_token)?;
-                let response = match store.delete(&id).await {
-                    Ok(()) => warp::reply::with_status(warp::reply(), StatusCode::NO_CONTENT)
-                        .into_response(),
-                    Err(StoreError::NotFound) => return Err(warp::reject::not_found()),
-                    Err(e) => json_error(store_error_status(&e), e.to_string()),
-                };
-                Ok(response)
-            },
-        )
+        .and_then(|id: String, store: SharedStore| async move {
+            let response = match store.delete(&id).await {
+                Ok(()) => {
+                    warp::reply::with_status(warp::reply(), StatusCode::NO_CONTENT).into_response()
+                }
+                Err(StoreError::NotFound(_)) => return Err(warp::reject::not_found()),
+                Err(e) => json_error(store_error_status(&e), e.to_string()),
+            };
+            Ok(response)
+        })
 }

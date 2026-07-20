@@ -1,16 +1,14 @@
 //! [`AdminRow`].
 
-#[allow(unused_imports)]
-use super::*;
-use crate::model::Listing;
-
 /// One rendered table row.
 pub struct AdminRow {
-    pub listing: Listing,
+    pub id: String,
     pub sku_code: String,
     pub name: String,
     pub price_display: String,
-    pub visible_label: String,
-    pub featured_label: String,
+    pub visible_label: &'static str,
+    pub featured_label: &'static str,
+    pub sort_order: u32,
+    pub updated_at: String,
     pub missing_catalog: bool,
 }

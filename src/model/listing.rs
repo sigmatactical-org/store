@@ -1,8 +1,9 @@
 //! [`Listing`].
 
-#[allow(unused_imports)]
-use super::*;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+
+use super::{CreateListing, UpdateListing};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Listing {
@@ -13,12 +14,11 @@ pub struct Listing {
     pub featured: bool,
     pub visible: bool,
     pub sort_order: u32,
-    pub updated_at: String,
+    pub updated_at: DateTime<Utc>,
 }
 impl Listing {
     /// New Listing from a create request.
     pub fn new(input: CreateListing) -> Self {
-        let now = chrono::Utc::now().to_rfc3339();
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             sku_id: input.sku_id.trim().to_string(),
@@ -26,7 +26,7 @@ impl Listing {
             featured: input.featured.unwrap_or(false),
             visible: input.visible.unwrap_or(true),
             sort_order: input.sort_order.unwrap_or(0),
-            updated_at: now,
+            updated_at: Utc::now(),
         }
     }
 
@@ -37,6 +37,6 @@ impl Listing {
         self.featured = input.featured;
         self.visible = input.visible;
         self.sort_order = input.sort_order;
-        self.updated_at = chrono::Utc::now().to_rfc3339();
+        self.updated_at = Utc::now();
     }
 }

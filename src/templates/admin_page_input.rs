@@ -1,14 +1,12 @@
 //! [`AdminPageInput`].
 
-#[allow(unused_imports)]
-use super::*;
 use crate::catalog::CatalogSku;
 use crate::identity::IdentityUser;
 use crate::model::Listing;
 
 /// Inputs for rendering the admin dashboard page.
 pub struct AdminPageInput<'a> {
-    pub listings: Vec<Listing>,
+    pub listings: &'a [Listing],
     pub catalog_skus: &'a [CatalogSku],
     pub catalog_configured: bool,
     pub catalog_error: Option<String>,

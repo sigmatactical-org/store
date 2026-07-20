@@ -1,9 +1,9 @@
 //! [`StorefrontTemplate`].
 
-#[allow(unused_imports)]
-use super::*;
 use askama::Template;
 use sigma_theme::nav::SiteHeader;
+
+use super::StorefrontRow;
 
 /// Public storefront home page: visible, catalog-backed listings only.
 #[derive(Template)]

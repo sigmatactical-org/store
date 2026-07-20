@@ -1,5 +1,4 @@
 [package]
-
 name = "sigma-store"
 version = "0.1.0"
 edition = "2024"
@@ -12,18 +11,18 @@ publish = false
 
 [dependencies]
 askama = "0.16.0"
-anyhow = "1.0.103"
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "serde"] }
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls"] }
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.150"
 sigma-theme = { git = "https://github.com/sigmatactical-org/sigma-theme.git", default-features = false, features = ["askama", "warp"] }
-sigma-cart-nav = { git = "https://github.com/sigmatactical-org/cart.git", package = "sigma-cart-nav" }
 sigma-pg = { git = "https://github.com/sigmatactical-org/sigma-pg.git" }
 sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-rustls", "postgres", "chrono"] }
-thiserror = "2.0.18"
-tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread", "net", "signal", "fs", "sync"] }
+tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread", "net", "signal"] }
 uuid = { version = "1.23.5", features = ["v4", "serde"] }
+warp = { version = "0.4.3", features = ["server"] }
+
+[dev-dependencies]
+serde_json = "1.0.150"
 warp = { version = "0.4.3", features = ["server", "test"] }
 
 [profile.release]

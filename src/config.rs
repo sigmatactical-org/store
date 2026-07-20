@@ -1,22 +1,17 @@
-/// PostgreSQL connection URL (shared Sigma database).
-#[must_use]
-pub fn database_url() -> String {
-    std::env::var("DATABASE_URL").unwrap_or_else(|_| sigma_pg::service_database_url("store"))
+use sigma_pg::clients::http::{env_url, normalize_base_url};
+
+/// Read an optional base URL from `var` (trimmed, trailing slash normalized).
+fn env_url_opt(var: &str) -> Option<String> {
+    std::env::var(var)
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| normalize_base_url(&s))
 }
 
 /// Base URL of the catalog service (e.g. `http://127.0.0.1:8081/`).
 #[must_use]
 pub fn catalog_base_url() -> Option<String> {
-    std::env::var("STORE_CATALOG_BASE_URL")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .map(|s| {
-            let mut url = s.trim().to_string();
-            if !url.ends_with('/') {
-                url.push('/');
-            }
-            url
-        })
+    env_url_opt("STORE_CATALOG_BASE_URL")
 }
 
 /// Whether catalog integration is configured.
@@ -29,27 +24,14 @@ pub fn catalog_configured() -> bool {
 /// live item count for the navbar badge (e.g. `http://127.0.0.1:8084/`).
 #[must_use]
 pub fn cart_base_url() -> Option<String> {
-    std::env::var("STORE_CART_BASE_URL")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .map(|s| normalize_base_url(&s))
-}
-
-/// Whether cart integration is configured.
-#[must_use]
-pub fn cart_configured() -> bool {
-    cart_base_url().is_some()
+    env_url_opt("STORE_CART_BASE_URL")
 }
 
 /// Public base URL of the cart service, where the browser is sent to add items
 /// and view the cart (e.g. `http://127.0.0.1:8084/`).
 #[must_use]
 pub fn cart_public_base_url() -> String {
-    std::env::var("STORE_CART_PUBLIC_URL")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .map(|s| normalize_base_url(&s))
-        .unwrap_or_else(|| "http://127.0.0.1:8084/".to_string())
+    env_url("STORE_CART_PUBLIC_URL", "http://127.0.0.1:8084/")
 }
 
 /// Browser origin of the cart service for CSP `form-action` (no trailing slash).
@@ -61,11 +43,7 @@ pub fn cart_public_origin() -> String {
 /// Public base URL of the contact service for the storefront contact form.
 #[must_use]
 pub fn contact_public_base_url() -> String {
-    std::env::var("STORE_CONTACT_PUBLIC_URL")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .map(|s| normalize_base_url(&s))
-        .unwrap_or_else(|| "http://127.0.0.1:8083/".to_string())
+    env_url("STORE_CONTACT_PUBLIC_URL", "http://127.0.0.1:8083/")
 }
 
 /// OIDC issuer URL for the identity provider (Keycloak realm URL).
@@ -103,31 +81,25 @@ pub fn identity_configured() -> bool {
 /// Public base URL of the identity BFF (e.g. `http://127.0.0.1:3000/`).
 #[must_use]
 pub fn identity_public_base_url() -> String {
-    std::env::var("STORE_IDENTITY_PUBLIC_URL")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .map(|s| normalize_base_url(&s))
-        .unwrap_or_else(|| "http://127.0.0.1:3000/".to_string())
+    env_url("STORE_IDENTITY_PUBLIC_URL", "http://127.0.0.1:3000/")
+}
+
+/// Browser origin of the identity BFF for CSP `connect-src` (no trailing slash).
+#[must_use]
+pub fn identity_public_origin() -> String {
+    identity_public_base_url().trim_end_matches('/').to_string()
 }
 
 /// Canonical public URL of this store (e.g. `http://127.0.0.1:8082/`).
 #[must_use]
 pub fn store_public_base_url() -> String {
-    std::env::var("STORE_PUBLIC_BASE_URL")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .map(|s| normalize_base_url(&s))
-        .unwrap_or_else(|| "http://127.0.0.1:8082/".to_string())
+    env_url("STORE_PUBLIC_BASE_URL", "http://127.0.0.1:8082/")
 }
 
 /// Public base URL of the info service for product detail links.
 #[must_use]
 pub fn info_public_base_url() -> String {
-    std::env::var("STORE_INFO_PUBLIC_URL")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .map(|s| normalize_base_url(&s))
-        .unwrap_or_else(|| "http://127.0.0.1:8080/".to_string())
+    env_url("STORE_INFO_PUBLIC_URL", "http://127.0.0.1:8080/")
 }
 
 /// External details page URL for a storefront SKU, when available.
@@ -141,18 +113,4 @@ pub fn product_details_url(sku_code: &str) -> Option<String> {
     } else {
         None
     }
-}
-
-fn normalize_base_url(url: &str) -> String {
-    let mut url = url.trim().to_string();
-    if !url.ends_with('/') {
-        url.push('/');
-    }
-    url
-}
-
-/// Browser origin of the identity BFF for CSP `connect-src` (no trailing slash).
-#[must_use]
-pub fn identity_public_origin() -> String {
-    identity_public_base_url().trim_end_matches('/').to_string()
 }

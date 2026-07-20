@@ -1,20 +1,15 @@
 use std::convert::Infallible;
 
+use sigma_pg::clients::cart::nav_cart_count;
 use warp::http::StatusCode;
 use warp::{Filter, Rejection, Reply};
 
 use crate::SharedStore;
-use crate::cart;
-use crate::catalog;
+use crate::catalog::{self, CatalogSku};
 use crate::identity;
-use crate::model::ListingForm;
+use crate::model::{Listing, ListingForm};
 use crate::store::StoreError;
 use crate::templates::{self, FormValues};
-
-/// Cookie tying a browser to its guest cart. Owned by the cart service and
-/// shared with the store (same host in dev, shared parent domain in prod) so
-/// the store can render a live item count.
-const CART_COOKIE: &str = "sigma_cart";
 
 /// Build this module's routes.
 pub fn routes(
@@ -23,35 +18,16 @@ pub fn routes(
     storefront_page(store.clone())
         .or(product_page(store.clone()))
         .or(admin_page(store.clone()))
-        .or(new_listing_page(store.clone()))
+        .or(new_listing_page())
         .or(create_listing_form(store.clone()))
         .or(edit_listing_page(store.clone()))
         .or(update_listing_form(store.clone()))
         .or(delete_listing_form(store))
 }
 
-/// Extract the guest cart id from the request `Cookie` header, if present.
-fn cart_id_from_cookie(cookie_header: Option<&str>) -> Option<String> {
-    cookie_header?.split(';').find_map(|pair| {
-        let (name, value) = pair.split_once('=')?;
-        (name.trim() == CART_COOKIE)
-            .then(|| value.trim().to_string())
-            .filter(|v| !v.is_empty())
-    })
-}
-
 /// Total item count for the nav cart badge (0 when there is no live cart).
 async fn cart_count(cookie_header: Option<&str>) -> u32 {
-    if !crate::config::cart_configured() {
-        return 0;
-    }
-    let Some(cart_id) = cart_id_from_cookie(cookie_header) else {
-        return 0;
-    };
-    match cart::get_cart(&cart_id).await {
-        Ok(Some(detail)) => detail.item_count(),
-        _ => 0,
-    }
+    nav_cart_count(crate::config::cart_base_url().as_deref(), cookie_header).await
 }
 
 /// Public storefront: `GET /`. Visible, catalog-backed listings only.
@@ -63,10 +39,14 @@ fn storefront_page(
         .and(warp::header::optional::<String>("cookie"))
         .and(store)
         .and_then(|cookie: Option<String>, store: SharedStore| async move {
-            let listings = store.list().await.map_err(|_| warp::reject::not_found())?;
-            let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
-            let count = cart_count(cookie.as_deref()).await;
-            templates::render_storefront_html(listings, &catalog_skus, count)
+            let (listings, catalog_skus, count) = tokio::join!(
+                store.list(),
+                catalog::fetch_skus(),
+                cart_count(cookie.as_deref())
+            );
+            let listings = listings.map_err(|_| warp::reject::not_found())?;
+            let catalog_skus = catalog_skus.unwrap_or_default();
+            templates::render_storefront_html(&listings, &catalog_skus, count)
                 .map(warp::reply::html)
                 .map_err(|_| warp::reject::not_found())
         })
@@ -82,13 +62,17 @@ fn product_page(
         .and(store)
         .and_then(
             |sku_code: String, cookie: Option<String>, store: SharedStore| async move {
-                let listings = store.list().await.map_err(|_| warp::reject::not_found())?;
-                let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
+                let (listings, catalog_skus, count) = tokio::join!(
+                    store.list(),
+                    catalog::fetch_skus(),
+                    cart_count(cookie.as_deref())
+                );
+                let listings = listings.map_err(|_| warp::reject::not_found())?;
+                let catalog_skus = catalog_skus.unwrap_or_default();
                 let Some(product) = templates::find_product(&sku_code, &listings, &catalog_skus)
                 else {
                     return Err(warp::reject::not_found());
                 };
-                let count = cart_count(cookie.as_deref()).await;
                 templates::render_product_html(product, count)
                     .map(warp::reply::html)
                     .map_err(|_| warp::reject::not_found())
@@ -106,21 +90,21 @@ fn admin_page(
         .and(warp::get())
         .and(store)
         .and_then(|store: SharedStore| async move {
-            let listings = store.list().await.map_err(|_| warp::reject::not_found())?;
-            let catalog_result = catalog::fetch_skus().await;
+            let (listings, catalog_result, identity_result) =
+                tokio::join!(store.list(), catalog::fetch_skus(), identity::fetch_users());
+            let listings = listings.map_err(|_| warp::reject::not_found())?;
             let (catalog_skus, catalog_error) = match catalog_result {
                 Ok(skus) => (Some(skus), None),
                 Err(e) => (None, Some(e.to_string())),
             };
-            let identity_result = identity::fetch_users().await;
             let (identity_users, identity_error) = match identity_result {
                 Ok(users) => (Some(users), None),
                 Err(e) if crate::config::identity_configured() => (None, Some(e.to_string())),
                 Err(_) => (None, None),
             };
             templates::render_admin_html(templates::AdminPageInput {
-                listings,
-                catalog_skus: catalog_skus.as_deref().unwrap_or(&[]),
+                listings: &listings,
+                catalog_skus: catalog_skus.as_deref().map_or(&[][..], Vec::as_slice),
                 catalog_configured: crate::config::catalog_configured(),
                 catalog_error,
                 identity_users: identity_users.as_deref().unwrap_or(&[]),
@@ -133,18 +117,15 @@ fn admin_page(
         })
 }
 
-fn new_listing_page(
-    store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
-) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
+fn new_listing_page()
+-> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
     warp::path("listings")
         .and(warp::path("new"))
         .and(warp::path::end())
         .and(warp::get())
-        .and(store)
-        .and_then(|store: SharedStore| async move {
-            let listings = store.list().await.map_err(|_| warp::reject::not_found())?;
+        .and_then(|| async move {
             let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
-            templates::render_form_html(listings, &catalog_skus, None, None)
+            templates::render_form_html(&catalog_skus, None, None)
                 .map(warp::reply::html)
                 .map_err(|_| warp::reject::not_found())
         })
@@ -159,18 +140,16 @@ fn create_listing_form(
         .and(warp::body::form())
         .and(store)
         .and_then(|form: ListingForm, store: SharedStore| async move {
-            let listings = store.list().await.map_err(|_| warp::reject::not_found())?;
             let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
             let values = form_to_values(&form);
             let response = match form.into_create() {
                 Ok(input) => {
                     if let Err(e) = catalog::require_active_sku(&input.sku_id).await {
                         render_form_error(
-                            listings,
                             &catalog_skus,
                             None,
                             values,
-                            invalid_input(format!("catalog validation failed: {e}")),
+                            StoreError::InvalidInput(format!("catalog validation failed: {e}")),
                         )
                     } else {
                         match store.create(input).await {
@@ -178,12 +157,12 @@ fn create_listing_form(
                                 warp::redirect::redirect(warp::http::Uri::from_static("/admin"))
                                     .into_response()
                             }
-                            Err(e) => render_form_error(listings, &catalog_skus, None, values, e),
+                            Err(e) => render_form_error(&catalog_skus, None, values, e),
                         }
                     }
                 }
                 Err(e) => {
-                    render_form_error(listings, &catalog_skus, None, values, invalid_input(e))
+                    render_form_error(&catalog_skus, None, values, StoreError::InvalidInput(e))
                 }
             };
             Ok::<_, Rejection>(response)
@@ -197,14 +176,12 @@ fn edit_listing_page(
         .and(warp::get())
         .and(store)
         .and_then(|id: String, store: SharedStore| async move {
-            let listing = match store.get(&id).await {
-                Ok(Some(listing)) => listing,
-                Ok(None) => return Err(warp::reject::not_found()),
-                Err(_) => return Err(warp::reject::not_found()),
+            let (listing, catalog_skus) = tokio::join!(store.get(&id), catalog::fetch_skus());
+            let Ok(Some(listing)) = listing else {
+                return Err(warp::reject::not_found());
             };
-            let listings = store.list().await.map_err(|_| warp::reject::not_found())?;
-            let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
-            templates::render_form_html(listings, &catalog_skus, Some(listing), None)
+            let catalog_skus = catalog_skus.unwrap_or_default();
+            templates::render_form_html(&catalog_skus, Some(listing), None)
                 .map(warp::reply::html)
                 .map_err(|_| warp::reject::not_found())
         })
@@ -219,19 +196,20 @@ fn update_listing_form(
         .and(store)
         .and_then(
             |id: String, form: ListingForm, store: SharedStore| async move {
-                let listings = store.list().await.map_err(|_| warp::reject::not_found())?;
-                let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
+                // Every error path re-renders the edit form, which needs the current
+                // listing: fetch it once up front instead of once per arm.
+                let (catalog_skus, listing) = tokio::join!(catalog::fetch_skus(), store.get(&id));
+                let catalog_skus = catalog_skus.unwrap_or_default();
+                let listing = listing.ok().flatten();
                 let values = form_to_values(&form);
                 let response = match form.into_update() {
                     Ok(input) => {
                         if let Err(e) = catalog::require_active_sku(&input.sku_id).await {
-                            let listing = store.get(&id).await.ok().flatten();
                             render_form_error(
-                                listings,
                                 &catalog_skus,
                                 listing,
                                 values,
-                                invalid_input(format!("catalog validation failed: {e}")),
+                                StoreError::InvalidInput(format!("catalog validation failed: {e}")),
                             )
                         } else {
                             match store.update(&id, input).await {
@@ -239,23 +217,16 @@ fn update_listing_form(
                                     warp::redirect::redirect(warp::http::Uri::from_static("/admin"))
                                         .into_response()
                                 }
-                                Err(e) => {
-                                    let listing = store.get(&id).await.ok().flatten();
-                                    render_form_error(listings, &catalog_skus, listing, values, e)
-                                }
+                                Err(e) => render_form_error(&catalog_skus, listing, values, e),
                             }
                         }
                     }
-                    Err(e) => {
-                        let listing = store.get(&id).await.ok().flatten();
-                        render_form_error(
-                            listings,
-                            &catalog_skus,
-                            listing,
-                            values,
-                            invalid_input(e),
-                        )
-                    }
+                    Err(e) => render_form_error(
+                        &catalog_skus,
+                        listing,
+                        values,
+                        StoreError::InvalidInput(e),
+                    ),
                 };
                 Ok::<_, Rejection>(response)
             },
@@ -269,17 +240,19 @@ fn delete_listing_form(
         .and(warp::post())
         .and(store)
         .and_then(|id: String, store: SharedStore| async move {
-            let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
             match store.delete(&id).await {
                 Ok(()) => Ok(
                     warp::redirect::redirect(warp::http::Uri::from_static("/admin"))
                         .into_response(),
                 ),
-                Err(StoreError::NotFound) => Err(warp::reject::not_found()),
+                Err(StoreError::NotFound(_)) => Err(warp::reject::not_found()),
                 Err(e) => {
-                    let listings = store.list().await.unwrap_or_default();
+                    let (listings, catalog_skus) =
+                        tokio::join!(store.list(), catalog::fetch_skus());
+                    let listings = listings.unwrap_or_default();
+                    let catalog_skus = catalog_skus.unwrap_or_default();
                     templates::render_admin_html(templates::AdminPageInput {
-                        listings,
+                        listings: &listings,
                         catalog_skus: &catalog_skus,
                         catalog_configured: crate::config::catalog_configured(),
                         catalog_error: None,
@@ -305,25 +278,14 @@ fn form_to_values(form: &ListingForm) -> FormValues {
     }
 }
 
-fn invalid_input(message: String) -> StoreError {
-    StoreError::InvalidInput(message)
-}
-
 fn render_form_error(
-    listings: Vec<crate::model::Listing>,
-    catalog_skus: &[catalog::CatalogSku],
-    listing: Option<crate::model::Listing>,
+    catalog_skus: &[CatalogSku],
+    listing: Option<Listing>,
     values: FormValues,
     err: StoreError,
 ) -> warp::reply::Response {
     let message = err.to_string();
-    match templates::render_form_html_with_values(
-        listings,
-        catalog_skus,
-        listing,
-        Some(message),
-        values,
-    ) {
+    match templates::render_form_html_with_values(catalog_skus, listing, Some(message), values) {
         Ok(html) => warp::reply::with_status(warp::reply::html(html), StatusCode::BAD_REQUEST)
             .into_response(),
         Err(_) => warp::reply::with_status(warp::reply(), StatusCode::INTERNAL_SERVER_ERROR)

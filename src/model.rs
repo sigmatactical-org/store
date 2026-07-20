@@ -44,31 +44,19 @@ fn parse_sort_order(value: &str) -> Result<Option<u32>, String> {
         .map_err(|_| "sort order must be a non-negative integer".to_string())
 }
 
+/// Render an optional cents amount as a US dollar string (empty when unset).
 #[must_use]
 pub fn format_price_cents(cents: Option<u64>) -> String {
-    match cents {
-        Some(c) => format!("${}.{:02}", group_thousands(c / 100), c % 100),
-        None => String::new(),
-    }
+    cents
+        .map(sigma_pg::money::format_price_cents)
+        .unwrap_or_default()
 }
 
-/// Render a whole-dollar amount with thousands separators (e.g. `175000` -> `175,000`).
-fn group_thousands(dollars: u64) -> String {
-    let digits = dollars.to_string();
-    let mut grouped = String::with_capacity(digits.len() + digits.len() / 3);
-    for (i, ch) in digits.chars().rev().enumerate() {
-        if i > 0 && i % 3 == 0 {
-            grouped.push(',');
-        }
-        grouped.push(ch);
-    }
-    grouped.chars().rev().collect()
-}
-
+/// Render an optional cents amount as a form field value, e.g. `1999` -> `19.99`.
 #[must_use]
 pub fn price_cents_to_form(cents: Option<u64>) -> String {
     match cents {
-        Some(c) => format!("{:.2}", c as f64 / 100.0),
+        Some(c) => format!("{}.{:02}", c / 100, c % 100),
         None => String::new(),
     }
 }
@@ -90,5 +78,14 @@ mod tests {
         assert_eq!(format_price_cents(Some(17_500_000)), "$175,000.00");
         assert_eq!(format_price_cents(Some(100)), "$1.00");
         assert_eq!(format_price_cents(None), "");
+    }
+
+    #[test]
+    fn price_cents_to_form_uses_integer_math() {
+        assert_eq!(price_cents_to_form(Some(1999)), "19.99");
+        assert_eq!(price_cents_to_form(Some(500)), "5.00");
+        assert_eq!(price_cents_to_form(Some(5)), "0.05");
+        assert_eq!(price_cents_to_form(Some(17_500_000)), "175000.00");
+        assert_eq!(price_cents_to_form(None), "");
     }
 }

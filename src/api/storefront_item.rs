@@ -1,7 +1,5 @@
 //! [`StorefrontItem`].
 
-#[allow(unused_imports)]
-use super::*;
 use crate::catalog::CatalogSku;
 use crate::model::Listing;
 

@@ -74,11 +74,11 @@
             <td>{% if row.price_display.is_empty() %}<span class="text-secondary">—</span>{% else %}{{ row.price_display }}{% endif %}</td>
             <td>{{ row.visible_label }}</td>
             <td>{{ row.featured_label }}</td>
-            <td>{{ row.listing.sort_order }}</td>
-            <td class="text-secondary"><small>{{ row.listing.updated_at }}</small></td>
+            <td>{{ row.sort_order }}</td>
+            <td class="text-secondary"><small>{{ row.updated_at }}</small></td>
             <td class="text-nowrap">
-              <a class="btn btn-sm btn-outline-primary" href="/listings/{{ row.listing.id }}/edit">Edit</a>
-              <form method="post" action="/listings/{{ row.listing.id }}/delete" class="d-inline" onsubmit="return confirm('Delete this listing?');">
+              <a class="btn btn-sm btn-outline-primary" href="/listings/{{ row.id }}/edit">Edit</a>
+              <form method="post" action="/listings/{{ row.id }}/delete" class="d-inline" onsubmit="return confirm('Delete this listing?');">
                 <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
               </form>
             </td>
