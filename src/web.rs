@@ -2,6 +2,7 @@ use std::convert::Infallible;
 
 use sigma_pg::clients::cart::nav_cart_count;
 use warp::http::StatusCode;
+use warp::reply::Response;
 use warp::{Filter, Rejection, Reply};
 
 use crate::SharedStore;
@@ -140,33 +141,27 @@ fn create_listing_form(
         .and(warp::body::form())
         .and(store)
         .and_then(|form: ListingForm, store: SharedStore| async move {
-            let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
-            let values = form_to_values(&form);
-            let response = match form.into_create() {
-                Ok(input) => {
-                    if let Err(e) = catalog::require_active_sku(&input.sku_id).await {
-                        render_form_error(
-                            &catalog_skus,
-                            None,
-                            values,
-                            StoreError::InvalidInput(format!("catalog validation failed: {e}")),
-                        )
-                    } else {
-                        match store.create(input).await {
-                            Ok(_) => {
-                                warp::redirect::redirect(warp::http::Uri::from_static("/admin"))
-                                    .into_response()
-                            }
-                            Err(e) => render_form_error(&catalog_skus, None, values, e),
-                        }
-                    }
-                }
-                Err(e) => {
-                    render_form_error(&catalog_skus, None, values, StoreError::InvalidInput(e))
-                }
-            };
-            Ok::<_, Rejection>(response)
+            Ok::<_, Rejection>(create_listing(form, store).await)
         })
+}
+
+/// Validate and persist a new listing, or re-render the form with the error.
+async fn create_listing(form: ListingForm, store: SharedStore) -> Response {
+    let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
+    let values = form_to_values(&form);
+
+    let input = match form.into_create() {
+        Ok(input) => input,
+        Err(e) => return render_form_error(&catalog_skus, None, values, StoreError::InvalidInput(e)),
+    };
+    if let Err(e) = catalog::require_active_sku(&input.sku_id).await {
+        let msg = format!("catalog validation failed: {e}");
+        return render_form_error(&catalog_skus, None, values, StoreError::InvalidInput(msg));
+    }
+    match store.create(input).await {
+        Ok(_) => redirect_to_admin(),
+        Err(e) => render_form_error(&catalog_skus, None, values, e),
+    }
 }
 
 fn edit_listing_page(
@@ -196,41 +191,32 @@ fn update_listing_form(
         .and(store)
         .and_then(
             |id: String, form: ListingForm, store: SharedStore| async move {
-                // Every error path re-renders the edit form, which needs the current
-                // listing: fetch it once up front instead of once per arm.
-                let (catalog_skus, listing) = tokio::join!(catalog::fetch_skus(), store.get(&id));
-                let catalog_skus = catalog_skus.unwrap_or_default();
-                let listing = listing.ok().flatten();
-                let values = form_to_values(&form);
-                let response = match form.into_update() {
-                    Ok(input) => {
-                        if let Err(e) = catalog::require_active_sku(&input.sku_id).await {
-                            render_form_error(
-                                &catalog_skus,
-                                listing,
-                                values,
-                                StoreError::InvalidInput(format!("catalog validation failed: {e}")),
-                            )
-                        } else {
-                            match store.update(&id, input).await {
-                                Ok(_) => {
-                                    warp::redirect::redirect(warp::http::Uri::from_static("/admin"))
-                                        .into_response()
-                                }
-                                Err(e) => render_form_error(&catalog_skus, listing, values, e),
-                            }
-                        }
-                    }
-                    Err(e) => render_form_error(
-                        &catalog_skus,
-                        listing,
-                        values,
-                        StoreError::InvalidInput(e),
-                    ),
-                };
-                Ok::<_, Rejection>(response)
+                Ok::<_, Rejection>(update_listing(id, form, store).await)
             },
         )
+}
+
+/// Validate and persist an edit, or re-render the form with the error.
+async fn update_listing(id: String, form: ListingForm, store: SharedStore) -> Response {
+    // Every error path re-renders the edit form, which needs the current
+    // listing: fetch it once up front instead of once per arm.
+    let (catalog_skus, listing) = tokio::join!(catalog::fetch_skus(), store.get(&id));
+    let catalog_skus = catalog_skus.unwrap_or_default();
+    let listing = listing.ok().flatten();
+    let values = form_to_values(&form);
+
+    let input = match form.into_update() {
+        Ok(input) => input,
+        Err(e) => return render_form_error(&catalog_skus, listing, values, StoreError::InvalidInput(e)),
+    };
+    if let Err(e) = catalog::require_active_sku(&input.sku_id).await {
+        let msg = format!("catalog validation failed: {e}");
+        return render_form_error(&catalog_skus, listing, values, StoreError::InvalidInput(msg));
+    }
+    match store.update(&id, input).await {
+        Ok(_) => redirect_to_admin(),
+        Err(e) => render_form_error(&catalog_skus, listing, values, e),
+    }
 }
 
 fn delete_listing_form(
@@ -241,10 +227,7 @@ fn delete_listing_form(
         .and(store)
         .and_then(|id: String, store: SharedStore| async move {
             match store.delete(&id).await {
-                Ok(()) => Ok(
-                    warp::redirect::redirect(warp::http::Uri::from_static("/admin"))
-                        .into_response(),
-                ),
+                Ok(()) => Ok(redirect_to_admin()),
                 Err(StoreError::NotFound(_)) => Err(warp::reject::not_found()),
                 Err(e) => {
                     let (listings, catalog_skus) =
@@ -266,6 +249,11 @@ fn delete_listing_form(
                 }
             }
         })
+}
+
+/// Redirect back to the admin dashboard after a successful mutation.
+fn redirect_to_admin() -> Response {
+    warp::redirect::redirect(warp::http::Uri::from_static("/admin")).into_response()
 }
 
 fn form_to_values(form: &ListingForm) -> FormValues {
