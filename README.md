@@ -43,7 +43,7 @@ Shared site chrome comes from [sigma-theme](https://github.com/sigmatactical-org
 
 The **Sign in** button on public pages links to `{STORE_IDENTITY_PUBLIC_URL}/auth/login` with `app_uri` and `redirect_uri` set to the store. Add the store origin to identity's `IDENTITY_LOGIN_REDIRECT_APP_URIS` and `IDENTITY_REGISTRATION_RETURN_URIS` (e.g. `http://localhost:8082/*`).
 
-SIGMA-RACER **Details** links to `{STORE_INFO_PUBLIC_URL}products/sigma-racer` on [sigma-info](https://github.com/sigmatactical-org/info), which hosts the tabbed build specifications fetched from [racer](https://github.com/sigmatactical-org/racer).
+SIGMA-RACER **Details** links to `{STORE_INFO_PUBLIC_URL}products/sigma-racer` on [sigma-info](https://github.com/sigmatactical-org/info), which hosts the tabbed build specifications fetched from [sigma-racer-specs](https://github.com/sigmatactical-org/sigma-racer-specs).
 
 Shoppers **Add to cart** from a product page. The button posts directly to the public [sigma-cart](https://github.com/sigmatactical-org/cart) service (`STORE_CART_PUBLIC_URL`), which owns the cart UI, the guest cart (tracked by a shared `sigma_cart` cookie), and the deposit-to-reserve checkout. The store reads that same cookie server-side (via `STORE_CART_BASE_URL`) to show a live item count in the navbar; when it is unset, the badge is simply hidden. For the cookie to be shared, the store and cart must sit on the same registrable domain (sibling subdomains in prod; the same `localhost` in dev).
 
