@@ -152,7 +152,9 @@ async fn create_listing(form: ListingForm, store: SharedStore) -> Response {
 
     let input = match form.into_create() {
         Ok(input) => input,
-        Err(e) => return render_form_error(&catalog_skus, None, values, StoreError::InvalidInput(e)),
+        Err(e) => {
+            return render_form_error(&catalog_skus, None, values, StoreError::InvalidInput(e));
+        }
     };
     if let Err(e) = catalog::require_active_sku(&input.sku_id).await {
         let msg = format!("catalog validation failed: {e}");
@@ -207,11 +209,18 @@ async fn update_listing(id: String, form: ListingForm, store: SharedStore) -> Re
 
     let input = match form.into_update() {
         Ok(input) => input,
-        Err(e) => return render_form_error(&catalog_skus, listing, values, StoreError::InvalidInput(e)),
+        Err(e) => {
+            return render_form_error(&catalog_skus, listing, values, StoreError::InvalidInput(e));
+        }
     };
     if let Err(e) = catalog::require_active_sku(&input.sku_id).await {
         let msg = format!("catalog validation failed: {e}");
-        return render_form_error(&catalog_skus, listing, values, StoreError::InvalidInput(msg));
+        return render_form_error(
+            &catalog_skus,
+            listing,
+            values,
+            StoreError::InvalidInput(msg),
+        );
     }
     match store.update(&id, input).await {
         Ok(_) => redirect_to_admin(),
