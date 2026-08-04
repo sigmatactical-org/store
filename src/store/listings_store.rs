@@ -31,13 +31,17 @@ impl ListingsStore {
         &self.pool
     }
 
+    /// Every listing in display order, capped at
+    /// [`sigma_pg::list::LIST_LIMIT`] rows.
     pub async fn list(&self) -> Result<Vec<Listing>, StoreError> {
         let rows = sqlx::query(
             "SELECT id, sku_id, price_cents, featured, visible, sort_order, updated_at \
-             FROM store.listings ORDER BY sort_order, sku_id",
+             FROM store.listings ORDER BY sort_order, sku_id LIMIT $1",
         )
+        .bind(sigma_pg::list::LIST_LIMIT)
         .fetch_all(&self.pool)
         .await?;
+        sigma_pg::list::warn_if_at_limit("listings", rows.len());
         Ok(rows.into_iter().map(row_to_listing).collect())
     }
 

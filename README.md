@@ -99,10 +99,10 @@ Run catalog and store on different ports:
 
 ```bash
 # Terminal 1 — catalog (default 8080)
-cd sigma/it/catalog && ./scripts/prepare-local.sh && cargo run -p sigma-catalog
+cd sigma/it/catalog && PORT=8080 cargo run -p sigma-catalog
 
 # Terminal 2 — cart (default 8084); point it back at the store for prices
-cd sigma/it/cart && ./scripts/prepare-local.sh
+cd sigma/it/cart
 export CART_CATALOG_BASE_URL=http://127.0.0.1:8080/
 export CART_STORE_BASE_URL=http://127.0.0.1:8082/
 export CART_STORE_PUBLIC_URL=http://127.0.0.1:8082/
@@ -110,7 +110,7 @@ export CART_PUBLIC_BASE_URL=http://127.0.0.1:8084/
 PORT=8084 cargo run -p sigma-cart
 
 # Terminal 3 — store
-cd sigma/it/store && ./scripts/prepare-local.sh
+cd sigma/it/store
 export STORE_CATALOG_BASE_URL=http://127.0.0.1:8080/
 export STORE_CART_BASE_URL=http://127.0.0.1:8084/
 export STORE_CART_PUBLIC_URL=http://127.0.0.1:8084/
@@ -123,11 +123,35 @@ cargo run -p sigma-store
 From the sigma workspace (`sigma/it/`):
 
 ```bash
-cd sigma/it && ./scripts/prepare-commerce-local.sh
+# when editing a shared crate, link it into every commerce service first:
+(cd sigma/it/platform && ./scripts/link-commerce-local.sh)
 STORE_CATALOG_BASE_URL=http://127.0.0.1:8080/ PORT=8082 cargo run -p sigma-store
 ```
 
 Open http://localhost:8082
+
+### Shared crates
+
+`sigma-theme` and `sigma-pg` are pinned git dependencies, so a
+fresh clone builds with nothing but `cargo`: the revision in `Cargo.toml` is
+fetched, and `build.rs` writes the `askama.toml` that points at sigma-theme's
+templates wherever Cargo put them.
+
+When one of those crates is checked out beside this repo and you are editing it,
+link the checkouts so your edits are picked up without a push:
+
+```bash
+./scripts/prepare-local.sh
+```
+
+That writes `[patch]` entries into `.cargo/config.toml` (gitignored) for the
+crates it finds and leaves the rest on their pinned revision; it prints what it
+linked. Undo by deleting the file. Note that building against a linked checkout
+rewrites `Cargo.lock` into path form — don't commit that; `platform`'s
+`scripts/relock.sh` restores the git-resolved lockfile CI expects.
+
+Bumping a shared crate is `platform/scripts/pin-shared-revs.sh <crate>` after
+that crate is pushed, which updates every consumer's pin at once.
 
 ### Seed the first product (Sigma Racer)
 

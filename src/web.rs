@@ -1,6 +1,7 @@
 use std::convert::Infallible;
 
 use sigma_pg::clients::cart::nav_cart_count;
+use sigma_theme::warp::internal_rejection;
 use warp::http::StatusCode;
 use warp::reply::Response;
 use warp::{Filter, Rejection, Reply};
@@ -45,11 +46,11 @@ fn storefront_page(
                 catalog::fetch_skus(),
                 cart_count(cookie.as_deref())
             );
-            let listings = listings.map_err(|_| warp::reject::not_found())?;
+            let listings = listings.map_err(|e| internal_rejection("list listings", e))?;
             let catalog_skus = catalog_skus.unwrap_or_default();
             templates::render_storefront_html(&listings, &catalog_skus, count)
                 .map(warp::reply::html)
-                .map_err(|_| warp::reject::not_found())
+                .map_err(|e| internal_rejection("render storefront page", e))
         })
 }
 
@@ -68,7 +69,7 @@ fn product_page(
                     catalog::fetch_skus(),
                     cart_count(cookie.as_deref())
                 );
-                let listings = listings.map_err(|_| warp::reject::not_found())?;
+                let listings = listings.map_err(|e| internal_rejection("list listings", e))?;
                 let catalog_skus = catalog_skus.unwrap_or_default();
                 let Some(product) = templates::find_product(&sku_code, &listings, &catalog_skus)
                 else {
@@ -76,7 +77,7 @@ fn product_page(
                 };
                 templates::render_product_html(product, count)
                     .map(warp::reply::html)
-                    .map_err(|_| warp::reject::not_found())
+                    .map_err(|e| internal_rejection("render product page", e))
             },
         )
 }
@@ -93,7 +94,7 @@ fn admin_page(
         .and_then(|store: SharedStore| async move {
             let (listings, catalog_result, identity_result) =
                 tokio::join!(store.list(), catalog::fetch_skus(), identity::fetch_users());
-            let listings = listings.map_err(|_| warp::reject::not_found())?;
+            let listings = listings.map_err(|e| internal_rejection("list listings", e))?;
             let (catalog_skus, catalog_error) = match catalog_result {
                 Ok(skus) => (Some(skus), None),
                 Err(e) => (None, Some(e.to_string())),
@@ -114,7 +115,7 @@ fn admin_page(
                 message: None,
             })
             .map(warp::reply::html)
-            .map_err(|_| warp::reject::not_found())
+            .map_err(|e| internal_rejection("render admin dashboard", e))
         })
 }
 
@@ -128,7 +129,7 @@ fn new_listing_page()
             let catalog_skus = catalog::fetch_skus().await.unwrap_or_default();
             templates::render_form_html(&catalog_skus, None, None)
                 .map(warp::reply::html)
-                .map_err(|_| warp::reject::not_found())
+                .map_err(|e| internal_rejection("render listing form", e))
         })
 }
 
@@ -152,7 +153,9 @@ async fn create_listing(form: ListingForm, store: SharedStore) -> Response {
 
     let input = match form.into_create() {
         Ok(input) => input,
-        Err(e) => return render_form_error(&catalog_skus, None, values, StoreError::InvalidInput(e)),
+        Err(e) => {
+            return render_form_error(&catalog_skus, None, values, StoreError::InvalidInput(e));
+        }
     };
     if let Err(e) = catalog::require_active_sku(&input.sku_id).await {
         let msg = format!("catalog validation failed: {e}");
@@ -178,7 +181,7 @@ fn edit_listing_page(
             let catalog_skus = catalog_skus.unwrap_or_default();
             templates::render_form_html(&catalog_skus, Some(listing), None)
                 .map(warp::reply::html)
-                .map_err(|_| warp::reject::not_found())
+                .map_err(|e| internal_rejection("render listing form", e))
         })
 }
 
@@ -207,11 +210,18 @@ async fn update_listing(id: String, form: ListingForm, store: SharedStore) -> Re
 
     let input = match form.into_update() {
         Ok(input) => input,
-        Err(e) => return render_form_error(&catalog_skus, listing, values, StoreError::InvalidInput(e)),
+        Err(e) => {
+            return render_form_error(&catalog_skus, listing, values, StoreError::InvalidInput(e));
+        }
     };
     if let Err(e) = catalog::require_active_sku(&input.sku_id).await {
         let msg = format!("catalog validation failed: {e}");
-        return render_form_error(&catalog_skus, listing, values, StoreError::InvalidInput(msg));
+        return render_form_error(
+            &catalog_skus,
+            listing,
+            values,
+            StoreError::InvalidInput(msg),
+        );
     }
     match store.update(&id, input).await {
         Ok(_) => redirect_to_admin(),
@@ -245,7 +255,7 @@ fn delete_listing_form(
                         message: Some(format!("Delete failed: {e}")),
                     })
                     .map(|html| warp::reply::html(html).into_response())
-                    .map_err(|_| warp::reject::not_found())
+                    .map_err(|e| internal_rejection("render admin dashboard", e))
                 }
             }
         })
