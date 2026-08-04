@@ -10,11 +10,6 @@ Repository: https://github.com/sigmatactical-org/store
 
 Shared site chrome comes from [sigma-theme](https://github.com/sigmatactical-org/sigma-theme). Product data comes from [sigma-catalog](https://github.com/sigmatactical-org/catalog). User directory comes from [sigma-identity](https://github.com/sigmatactical-org/identity) (Keycloak Admin API).
 
-## Public vs internal
-
-- **Public** (`sigmatactical.store`): `GET /` (storefront browse) and `GET /products/{sku_code}` (product detail). The cart itself is a separate public service — [sigma-cart](https://github.com/sigmatactical-org/cart) — that this store adds items to. No admin data is rendered on these pages.
-- **Internal / admin only**: `GET /admin` (listing management + identity users) and the `/listings/*` CRUD pages. These are not linked from the public pages and, like [sigma-catalog](https://github.com/sigmatactical-org/catalog), [sigma-cart](https://github.com/sigmatactical-org/cart), and [sigma-contact](https://github.com/sigmatactical-org/contact), are intended to be reached only through the [sigma-identity](https://github.com/sigmatactical-org/identity) authenticated proxy in production — not exposed on the public domain.
-
 ## Features
 
 - **Catalog integration** — fetch SKUs from sigma-catalog at request time
@@ -60,6 +55,11 @@ Each **listing** references a catalog SKU by id:
 - `sort_order` — display order (lower first)
 
 ## API
+
+### Public vs internal
+
+- **Public** (`sigmatactical.store`): `GET /` (storefront browse) and `GET /products/{sku_code}` (product detail). The cart itself is a separate public service — [sigma-cart](https://github.com/sigmatactical-org/cart) — that this store adds items to. No admin data is rendered on these pages.
+- **Internal / admin only**: `GET /admin` (listing management + identity users) and the `/listings/*` CRUD pages. These are not linked from the public pages and, like [sigma-catalog](https://github.com/sigmatactical-org/catalog), [sigma-cart](https://github.com/sigmatactical-org/cart), and [sigma-contact](https://github.com/sigmatactical-org/contact), are intended to be reached only through the [sigma-identity](https://github.com/sigmatactical-org/identity) authenticated proxy in production — not exposed on the public domain.
 
 | Method | Path | Description |
 |--------|------|-------------|
